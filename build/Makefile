@@ -1,5 +1,5 @@
 OWNER=janrajc
-IMAGE_NAME=k8s-control-plane
+IMAGE_NAME=multicluster-ingress-controller
 
 .PHONY: build
 build:
@@ -8,6 +8,8 @@ build:
 test:
 	 go test -v ../pkg/... -coverprofile cp.txt 
 	 go tool cover -html=cp.txt -o cover.html
+run:
+	cd ../pkg;go run main.go
 
 coverage:
 	 go test -v ../... -coverprofile=coverage.txt -covermode=atomic
