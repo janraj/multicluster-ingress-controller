@@ -1,0 +1,170 @@
+{
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "schemes": [
+    "http"
+  ],
+  "swagger": "2.0",
+  "info": {
+    "description": "Multicluster Ingress Controller is capable of proccessing ingress events from multicluster.\nIt can send kubernetes events to multiple servers and have control of event selection.",
+    "title": "Multicluster Ingress Controller API.",
+    "contact": {
+      "name": "Janraj CJ",
+      "email": "janrajcj@gmail.com"
+    },
+    "version": "1.0.0"
+  },
+  "host": "localhost:8000",
+  "basePath": "/",
+  "paths": {
+    "/api/v1/controller": {
+      "get": {
+        "description": "description: Returns 200 if it success. If there is no registeration, Error Not Found (404) will be returned.",
+        "tags": [
+          "ClusterRegistration"
+        ],
+        "summary": "summary: This API lists all the configured entity details which incldue cluster names, config file path, watch events and the server list.",
+        "operationId": "createClientServer",
+        "responses": {}
+      },
+      "put": {
+        "description": "If there is no matching entity, update operation cannot be performed. Error Not Found (404) will be returned.",
+        "tags": [
+          "ClusterRegistration"
+        ],
+        "summary": "This API can be used for updating the entities of a configured cluster.",
+        "operationId": "createClientServer",
+        "parameters": [
+          {
+            "description": "Kubernetes API server URL",
+            "name": "RequestBody",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "required": [
+                "ClusterName",
+                "ConfigFileName"
+              ],
+              "properties": {
+                "ClusterName": {
+                  "type": "string"
+                },
+                "ConfigFileName": {
+                  "type": "string"
+                }
+              },
+              "example": {
+                "ClusterName": "ClusterABC",
+                "ConfigFileName": "/home/.kube/config"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation"
+          }
+        }
+      },
+      "post": {
+        "description": "Cluster Name can be any string. ConfigFileName must include relative path of kubernetes config file. ClusterName and ClusterFileName are mandatory argument.",
+        "tags": [
+          "ClusterRegistration"
+        ],
+        "summary": "This API adds cluster details which include cluster name, config path and list of servers.",
+        "operationId": "createClientServer",
+        "parameters": [
+          {
+            "description": "Kubernetes API server URL",
+            "name": "RequestBody",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "required": [
+                "ClusterName",
+                "ConfigFileName"
+              ],
+              "properties": {
+                "ClusterName": {
+                  "type": "string"
+                },
+                "ConfigFileName": {
+                  "type": "string"
+                },
+                "ServerURL": {
+                  "type": "array"
+                },
+                "WatchEvents": {
+                  "type": "array"
+                }
+              },
+              "example": {
+                "ClusterName": "ClusterABC",
+                "ConfigFileName": "/home/.kube/config",
+                "ServerURL": [
+                  "http://22.22.22.22",
+                  "http://127.0.0.1:9000/"
+                ],
+                "WatchEvents": [
+                  "ingresses",
+                  "endpoints"
+                ]
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation"
+          }
+        }
+      },
+      "delete": {
+        "description": "If there is no entity configured, Error Not Found (404) will be returned.",
+        "tags": [
+          "ClusterRegistration"
+        ],
+        "summary": "Delete the cluster details.",
+        "operationId": "createClientServer",
+        "parameters": [
+          {
+            "description": "Kubernetes API server URL",
+            "name": "RequestBody",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "required": [
+                "ClusterName",
+                "ConfigFileName"
+              ],
+              "properties": {
+                "ClusterName": {
+                  "type": "string"
+                },
+                "ConfigFileName": {
+                  "type": "string"
+                }
+              },
+              "example": {
+                "ClusterName": "ClusterABC",
+                "ConfigFileName": "/home/.kube/config"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation"
+          },
+          "404": {
+            "description": "entity did not find"
+          }
+        }
+      }
+    }
+  }
+}
