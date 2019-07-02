@@ -93,6 +93,22 @@ func ingressEventParseAndSendData(obj interface{}, eventType string, contr Contr
 	parseAndSendData(string (message), objJson.ObjectMeta,  obj.(*v1beta1.Ingress).TypeMeta, "Ingress", eventType, contr)
 
 }
+func secretEventParseAndSendData(obj interface{}, eventType string, contr Controller) {
+	objByte, err := json.Marshal(obj)
+        if err != nil {
+        	klog.Errorf("[ERROR] Failed to Marshal original object: %v", err)
+        }
+        var objJson v1.Secret
+	if err = json.Unmarshal(objByte, &objJson); err != nil {
+                klog.Errorf("[ERROR] Failed to unmarshal original object: %v", err)
+        }
+	if (objJson.ObjectMeta.Namespace == "kube-system"){
+		return
+	}
+	message, err := json.MarshalIndent(objJson, "", "  ")
+	parseAndSendData(string (message), objJson.ObjectMeta,  obj.(*v1.Secret).TypeMeta, "Secret", eventType, contr)
+
+}
 func IngressWatcher(api *KubernetesAPIServer, contr Controller) {
         ingressListWatcher := cache.NewListWatchFromClient(api.Client.ExtensionsV1beta1().RESTClient(), "ingresses", v1.NamespaceAll, fields.Everything())
         _, controller := cache.NewInformer(ingressListWatcher, &v1beta1.Ingress{}, 0, cache.ResourceEventHandlerFuncs{
@@ -104,6 +120,24 @@ func IngressWatcher(api *KubernetesAPIServer, contr Controller) {
                 },
                 DeleteFunc: func(obj interface{}) {
 			ingressEventParseAndSendData(obj, "DELETED", contr)
+                },
+        },
+        )
+        stop := make(chan struct{})
+        go controller.Run(stop)
+        return
+}
+func SecretWatcher(api *KubernetesAPIServer, contr Controller) {
+        secretListWatcher := cache.NewListWatchFromClient(api.Client.Core().RESTClient(), "secrets", v1.NamespaceAll, fields.Everything())
+        _, controller := cache.NewInformer(secretListWatcher, &v1.Secret{}, 0, cache.ResourceEventHandlerFuncs{
+                AddFunc: func(obj interface{}) {
+			secretEventParseAndSendData(obj, "ADDED", contr)
+                },
+                UpdateFunc: func(obj interface{}, newobj interface{}) {
+			secretEventParseAndSendData(newobj, "MODIFIED", contr)
+                },
+                DeleteFunc: func(obj interface{}) {
+			secretEventParseAndSendData(obj, "DELETED", contr)
                 },
         },
         )
@@ -242,6 +276,7 @@ func parseAndSendData(obj string, metaData  metav1.ObjectMeta, metaHeader metav1
 
 func sendData(data *bytes.Buffer, contr Controller){
 	//servers.mux.Lock()
+        fmt.Print("[INFO] Sending the data")
 	for _,v := range contr.ServerList {	
 		tmp_data := *data
 		result, err := http.Post(v, "application/json", &tmp_data)
@@ -274,6 +309,9 @@ func StartController(configFile string, servers []string, events [] string){
          }
 	 if (strings.ToLower(event) == "services"){
 		ServiceWatcher(api, contr)
+         }
+	 if (strings.ToLower(event) == "secrets"){
+		SecretWatcher(api, contr)
          }
      }
 }
