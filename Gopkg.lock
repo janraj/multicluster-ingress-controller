@@ -103,9 +103,12 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:056e4d2b8b82e00e0ed2b6943485289344c885dad01bd930cb00b3d4b6cad744"
+  digest = "1:92f7024742d4c497ea9d599a5bb67530d0b4b532243a5b7fd8107d7fc684f1ea"
   name = "github.com/janraj/multicluster-ingress-controller"
-  packages = ["pkg/interface"]
+  packages = [
+    "pkg/controller",
+    "pkg/interface",
+  ]
   pruneopts = "UT"
   revision = "22578b5547ba26eb8daeacee12430222c774b704"
 
@@ -474,6 +477,7 @@
     "github.com/golang/protobuf/protoc-gen-go",
     "github.com/google/uuid",
     "github.com/gorilla/mux",
+    "github.com/janraj/multicluster-ingress-controller/pkg/controller",
     "github.com/janraj/multicluster-ingress-controller/pkg/interface",
     "github.com/smartystreets/goconvey/convey",
     "k8s.io/api/core/v1",
