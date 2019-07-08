@@ -23,8 +23,8 @@ package main
   
 import (
         "log"
-	intr "multicluster-ingress-controller/pkg/interface"
-	//intr "github.com/janraj/multicluster-ingress-controller/pkg/interface"
+	//intr "multicluster-ingress-controller/pkg/interface"
+	intr "github.com/janraj/multicluster-ingress-controller/pkg/interface"
 )
 
 func InitCitrixControlPlane() error {
