@@ -8,7 +8,7 @@ import (
         "net/http"
         "time"
 	"fmt"
-	ctr "github.com/janraj/multicluster-ingress-controller/pkg/controller"
+	ctr "multicluster-ingress-controller/pkg/controller"
 	"os"
 )
 
