@@ -1,6 +1,6 @@
 OWNER=janrajc
-IMAGE_NAME=multicluster-ingress-controller
-
+IMAGE_NAME=citrix-k8s-multicluster-ingress-controller
+version=1.1.0
 .PHONY: build
 build:
 	docker build -f Dockerfile -t $(IMAGE_NAME) .. -m 4g
@@ -23,6 +23,8 @@ publish:
 	@echo 'publish latest to $(DOCKER_REGISTRY)'
 	docker tag  $(IMAGE_NAME):latest $(DOCKER_REGISTRY)/$(IMAGE_NAME):latest
 	docker push $(DOCKER_REGISTRY)/$(IMAGE_NAME):latest
+	docker tag  $(IMAGE_NAME):latest $(DOCKER_REGISTRY)/$(IMAGE_NAME):$(version)
+	docker push $(DOCKER_REGISTRY)/$(IMAGE_NAME):$(version)
 proto:
 	protoc -I/usr/local/include -I. \
 	-I${GOPATH}/src \
