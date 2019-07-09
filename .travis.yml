@@ -5,12 +5,6 @@ go:
 services:
 - docker
 sudo: required
-env:
-  global:
-  - CHANGE_MINIKUBE_NONE_USER=true
-  - MINIKUBE_WANTREPORTERRORPROMPT=false
-  - MINIKUBE_WANTUPDATENOTIFICATION=false
-  - KUBECONFIG=/home/travis/.kube/config
 before_script:
   - export GOPATH=$HOME/gopath
   - export TRAVIS_BUILD_DIR=$HOME/gopath/src/multicluster-ingress-controller
