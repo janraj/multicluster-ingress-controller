@@ -5,21 +5,10 @@ go:
 services:
 - docker
 sudo: required
-before_script:
-  - export GOPATH=$HOME/gopath
-  - export TRAVIS_BUILD_DIR=$HOME/gopath/src/multicluster-ingress-controller
-  - cd $HOME/gopath/src
-  - mv github.com/janraj/multicluster-ingress-controller ./
-  - cd multicluster-ingress-controller/build
+env: GO111MODULE=on GOFLAGS='-mod vendor'
+before_script: cd build
 jobs:
   include:
-  - stage: Trying with new Change
-    script:
-    - export GOPATH=$HOME/gopath
-    - export TRAVIS_BUILD_DIR=$HOME/gopath/src/multicluster-ingress-controller
-    - cd $HOME/gopath/src
-    - mv github.com/janraj/multicluster-ingress-controller ./
-    - cd multicluster-ingress-controller/build
   - stage: Unit Test with Code Coverage of Citrix Node Controller
     script:
     - make coverage
