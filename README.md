@@ -44,6 +44,7 @@ Multicluster-Ingress-Controller is a rest based go library which exposes few Res
 
 ## Getting Started
 
+Run locally
 ```
 	1) Download/Clone the Multicluster-Ingress-Controller.
 		
@@ -52,7 +53,16 @@ Multicluster-Ingress-Controller is a rest based go library which exposes few Res
 
 	3) Access the Rest Interface via http://localhost:8000/swagger/
 ```
-	
+Creating Binary and Docker Image
+```
+	1) Download/Clone the Multicluster-Ingress-Controller.
+		
+	2) Perform "make build" from build folder.
+		This builds a go binary and docker image and stored under build folder (citrix-k8s-multicluster-ingress-controller).
+
+	3) Copy binary and run in any machine (./citrix-k8s-multicluster-ingress-controller)
+	4) Use Docker commands to load and run as docker images.
+
 ## Configuration
 
 There is no specific configuratiosn required at initial phase. However right now user has to keep all the cluster kube config file where the controller is running. We are working on token based solution which will remove this dependancy.

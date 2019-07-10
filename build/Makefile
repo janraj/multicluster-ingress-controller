@@ -3,6 +3,7 @@ IMAGE_NAME=citrix-k8s-multicluster-ingress-controller
 version=1.1.0
 .PHONY: build
 build:
+	cd ../pkg;go build  -o $(IMAGE_NAME) main.go;mv $(IMAGE_NAME) ../build
 	docker build -f Dockerfile -t $(IMAGE_NAME) .. -m 4g
 	docker save -o $(IMAGE_NAME).tar $(IMAGE_NAME)
 test:
