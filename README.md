@@ -62,6 +62,7 @@ Creating Binary and Docker Image
 
 	3) Copy binary and run in any machine (./citrix-k8s-multicluster-ingress-controller)
 	4) Use Docker commands to load and run as docker images.
+```
 
 ## Configuration
 
