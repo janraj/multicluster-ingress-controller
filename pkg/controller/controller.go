@@ -178,6 +178,27 @@ func EndpointWatcher(api *KubernetesAPIServer, contr Controller) {
         go controller.Run(stop)
         return
 }
+func EndpointGet(api *KubernetesAPIServer) *v1.EndpointsList {
+        fmt.Println("ENDPOINT GET API: Calling kubernetes API server")
+	endpointslist, err := api.Client.Core().Endpoints("").List(metav1.ListOptions{})
+	if err != nil {
+		panic(err.Error())
+	}
+	/*
+	fmt.Println(endpointslist)
+	obj, err := json.Marshal(endpointslist)
+        if err != nil {
+        	klog.Errorf("[ERROR] Failed to Marshal original endpoint object: %v", err)
+        }
+        var objJson v1.EndpointsList
+	if err = json.Unmarshal(obj, &objJson); err != nil {
+        	klog.Errorf("[ERROR] Failed to unmarshal original object: %v", err)
+        }
+	message, err := json.MarshalIndent(objJson, "", "  ")
+        return string(message)
+	*/
+	return endpointslist
+}
 
 
 func serviceEventParseAndSendData(obj interface{}, eventType string, contr Controller) {
@@ -314,4 +335,18 @@ func StartController(configFile string, servers []string, events [] string){
 		SecretWatcher(api, contr)
          }
      }
+}
+
+func GetK8sEvents(configFile string, event string) (interface{}, error){
+     api, err := CreateK8sApiserverClient(configFile) 
+     var message interface{}
+     if (err != nil){
+	fmt.Println("Error while starting client API session")
+	return "",err
+     }
+     if (strings.ToLower(event) == "endpoints"){
+	message = EndpointGet(api)
+	fmt.Printf("ENDPOINT API: List of endpoints retrieved %s", message)
+     }
+     return message, err
 }

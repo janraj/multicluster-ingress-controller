@@ -7,8 +7,10 @@ import (
         "k8s.io/klog"
         "net/http"
         "time"
+        "strings"
 	"fmt"
-	ctr "github.com/janraj/multicluster-ingress-controller/pkg/controller"
+	//ctr "github.com/janraj/multicluster-ingress-controller/pkg/controller"
+	ctr "multicluster-ingress-controller/pkg/controller"
 	"os"
 )
 
@@ -125,6 +127,62 @@ func CreateClientServerHandler(r *mux.Router) {
 	
 }
 
+type endpoints struct {
+    	ClusterName string 
+    	ConfigFileName string 
+    	ServerURL []string 
+    	WatchEvents []string 
+}
+var k8sEndpointPath string = "/api/v1/endpoints"
+func KubernetesEventsHandler(r *mux.Router){
+	
+	// swagger:operation  GET /api/v1/endpoints/{clustername} K8sEndpoints repoList
+	// ---
+	// summary: This API lists all the endpoints from a given cluster name.
+	// description: Test Returns 200 if it success. If there is no cluster registered, Error Not Found (404) will be returned.
+	// parameters:
+	// - name: clustername
+	//   in: path
+	//   description: username of cluster
+	//   type: string
+	//   required: true
+	// responses:
+	//   '200':
+	//     description: successful operation
+	//   '204':
+	//     description: successful operation, list is empty.
+	r.HandleFunc(k8sEndpointPath+"/{clustername}", GetEndpoints).Methods("GET")
+}
+
+func GetEndpoints(resp http.ResponseWriter, req *http.Request){
+	fmt.Println("Get Endpoints from the cluster")
+
+	if (clientServerList == nil) {
+		fmt.Println("ENDPOINT GET API: There is no cluster registered")
+		resp.WriteHeader(http.StatusNoContent)
+		return 
+	} 
+    	resp.Header().Set("Content-Type", "application/json")
+	clusterName := strings.TrimPrefix(req.URL.Path, "/api/v1/endpoints/")
+        fmt.Println("ENDPOINT: cluster Name input:", clusterName)
+	for id := range clientServerList {
+       		if (clientServerList[id].ClusterName == clusterName){
+			fmt.Println("ENDPOINT GET API: Valid Cluster")
+			message, err := ctr.GetK8sEvents(clientServerList[id].ConfigFileName, "endpoints")
+			if (err != nil) {
+				resp.WriteHeader(http.StatusInternalServerError)
+				return 
+			}
+			json.NewEncoder(resp).Encode(message)
+			resp.WriteHeader(http.StatusOK)
+			return 
+		} 
+    	}
+	fmt.Println("ENDPOINT GET API: There is no cluster registered with the name",clusterName)
+	resp.WriteHeader(http.StatusNoContent)
+	return
+}
+
 func GetAllClientServer(resp http.ResponseWriter, req *http.Request){
 	fmt.Println("Get All Client Server")
 
@@ -231,11 +289,12 @@ func StartRestServer() (*http.Server){
 	r.PathPrefix("/swagger/").Handler(http.StripPrefix("/swagger/", http.FileServer(http.Dir(dir+"/swaggerui"))))
 	
 
-	CreateClientServerHandler(r)	
+	CreateClientServerHandler(r)
+        KubernetesEventsHandler(r)	
        	 
 	srv := &http.Server{
                 Handler:      r,
-                Addr:         "localhost:8000",
+                Addr:         ":8000",
                 ReadTimeout:  10 * time.Second,
                 WriteTimeout: 10 * time.Second,
         }
