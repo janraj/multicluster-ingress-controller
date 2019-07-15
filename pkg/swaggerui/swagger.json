@@ -16,12 +16,12 @@
       "name": "Janraj CJ",
       "email": "janrajcj@gmail.com"
     },
-    "version": "1.0.0"
+    "version": "1.1.0"
   },
-  "host": "localhost:8000",
+  "host": "0.0.0.0:8000",
   "basePath": "/",
   "paths": {
-    "/api/v1/controller": {
+    "/cic/v1/config/controller": {
       "get": {
         "description": "description: Returns 200 if it success. If there is no registeration, Error Not Found (404) will be returned.",
         "tags": [
@@ -166,7 +166,7 @@
         }
       }
     },
-    "/api/v1/endpoints/{clustername}": {
+    "/cic/v1/config/endpoints/{clustername}": {
       "get": {
         "description": "Test Returns 200 if it success. If there is no cluster registered, Error Not Found (404) will be returned.",
         "tags": [

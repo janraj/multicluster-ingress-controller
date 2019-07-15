@@ -25,10 +25,10 @@ type createClientServer struct {
     	WatchEvents []string 
 }
 var clientServerList []createClientServer
-var routePath string = "/api/v1/controller"
+var routePath string = "/cic/v1/config/controller"
 func CreateClientServerHandler(r *mux.Router) {
 
-	// swagger:route GET /api/v1/controller ClusterRegistration createClientServer
+	// swagger:route GET /cic/v1/config/controller ClusterRegistration createClientServer
    	// ---
 	// summary: This API lists all the configured entity details which incldue cluster names, config file path, watch events and the server list.
 	// description: Returns 200 if it success. If there is no registeration, Error Not Found (404) will be returned.
@@ -39,7 +39,7 @@ func CreateClientServerHandler(r *mux.Router) {
    	//     description: successful operation, list is empty.
 	r.HandleFunc(routePath, GetAllClientServer).Methods("GET")
 
-	// swagger:operation POST /api/v1/controller ClusterRegistration createClientServer
+	// swagger:operation POST /cic/v1/config/controller ClusterRegistration createClientServer
    	// ---
 	// summary: This API adds cluster details which include cluster name, config path and list of servers.
 	// description: Cluster Name can be any string. ConfigFileName must include relative path of kubernetes config file. ClusterName and ClusterFileName are mandatory argument.
@@ -71,7 +71,7 @@ func CreateClientServerHandler(r *mux.Router) {
    	//     description: successful operation
 	r.HandleFunc(routePath, PostClientServer).Methods("POST")
 	
-	// swagger:operation DELETE /api/v1/controller ClusterRegistration createClientServer
+	// swagger:operation DELETE /cic/v1/config/controller ClusterRegistration createClientServer
    	// ---
 	// summary: Delete the cluster details.
 	// description: If there is no entity configured, Error Not Found (404) will be returned.
@@ -99,7 +99,7 @@ func CreateClientServerHandler(r *mux.Router) {
    	//     description: entity did not find
 	r.HandleFunc(routePath, DeleteClientServer).Methods("DELETE")
 	
-	// swagger:operation PUT /api/v1/controller ClusterRegistration createClientServer
+	// swagger:operation PUT /cic/v1/config/controller ClusterRegistration createClientServer
    	// ---
 	// summary: This API can be used for updating the entities of a configured cluster.
 	// description: If there is no matching entity, update operation cannot be performed. Error Not Found (404) will be returned.
@@ -133,10 +133,10 @@ type endpoints struct {
     	ServerURL []string 
     	WatchEvents []string 
 }
-var k8sEndpointPath string = "/api/v1/endpoints"
+var k8sEndpointPath string = "/cic/v1/config/endpoints"
 func KubernetesEventsHandler(r *mux.Router){
 	
-	// swagger:operation  GET /api/v1/endpoints/{clustername} K8sEndpoints repoList
+	// swagger:operation  GET /cic/v1/config/endpoints/{clustername} K8sEndpoints repoList
 	// ---
 	// summary: This API lists all the endpoints from a given cluster name.
 	// description: Test Returns 200 if it success. If there is no cluster registered, Error Not Found (404) will be returned.
@@ -163,7 +163,7 @@ func GetEndpoints(resp http.ResponseWriter, req *http.Request){
 		return 
 	} 
     	resp.Header().Set("Content-Type", "application/json")
-	clusterName := strings.TrimPrefix(req.URL.Path, "/api/v1/endpoints/")
+	clusterName := strings.TrimPrefix(req.URL.Path, "/cic/v1/config/endpoints/")
         fmt.Println("ENDPOINT: cluster Name input:", clusterName)
 	for id := range clientServerList {
        		if (clientServerList[id].ClusterName == clusterName){

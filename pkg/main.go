@@ -7,7 +7,7 @@
 // 
 //
 //     Schemes: http
-//     Host: localhost:8000
+//     Host: 0.0.0.0:8000
 //     BasePath: /
 //     Version: 1.0.0
 //     Contact: Janraj CJ<janrajcj@gmail.com> 
