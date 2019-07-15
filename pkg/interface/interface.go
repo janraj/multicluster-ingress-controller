@@ -9,8 +9,8 @@ import (
         "time"
         "strings"
 	"fmt"
-	//ctr "github.com/janraj/multicluster-ingress-controller/pkg/controller"
-	ctr "multicluster-ingress-controller/pkg/controller"
+	ctr "github.com/janraj/multicluster-ingress-controller/pkg/controller"
+	//ctr "multicluster-ingress-controller/pkg/controller"
 	"os"
 )
 
