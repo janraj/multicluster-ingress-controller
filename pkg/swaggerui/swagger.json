@@ -16,7 +16,7 @@
       "name": "Janraj CJ",
       "email": "janrajcj@gmail.com"
     },
-    "version": "1.1.0"
+    "version": "1.0.0"
   },
   "host": "0.0.0.0:8000",
   "basePath": "/",
@@ -85,8 +85,7 @@
             "schema": {
               "type": "object",
               "required": [
-                "ClusterName",
-                "ConfigFileName"
+                "ClusterName"
               ],
               "properties": {
                 "ClusterName": {

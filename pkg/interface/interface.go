@@ -51,7 +51,6 @@ func CreateClientServerHandler(r *mux.Router) {
         //     type: object
         //     required:
         //       - ClusterName
-        //       - ConfigFileName
         //     properties:
         //       ClusterName:
         //          type: string
