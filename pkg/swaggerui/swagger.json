@@ -21,7 +21,41 @@
   "host": "0.0.0.0:8000",
   "basePath": "/",
   "paths": {
-    "/cic/v1/config/controller": {
+    "/cic/nitro/v1/config/cluster/{clustername}/namespace/{namespace}": {
+      "get": {
+        "description": "Test Returns 200 if it success. If there is no cluster registered, Error Not Found (404) will be returned.",
+        "tags": [
+          "K8sNamespace"
+        ],
+        "summary": "Get the namespace details.",
+        "operationId": "repoList",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Name of the cluster",
+            "name": "clustername",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "Provides namespace details",
+            "name": "namespace",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation"
+          },
+          "204": {
+            "description": "successful operation, list is empty."
+          }
+        }
+      }
+    },
+    "/cic/nitro/v1/config/controller": {
       "get": {
         "description": "description: Returns 200 if it success. If there is no registeration, Error Not Found (404) will be returned.",
         "tags": [
@@ -165,7 +199,7 @@
         }
       }
     },
-    "/cic/v1/config/endpoints/{clustername}": {
+    "/cic/nitro/v1/config/endpoints/{clustername}": {
       "get": {
         "description": "Test Returns 200 if it success. If there is no cluster registered, Error Not Found (404) will be returned.",
         "tags": [

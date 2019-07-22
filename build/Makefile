@@ -4,8 +4,13 @@ version=1.1.0
 .PHONY: build
 build:
 	cd ../pkg;go build  -o $(IMAGE_NAME) main.go;mv $(IMAGE_NAME) ../build
+	cd ../pkg;env  GOOS=freebsd  GOARCH=amd64  go build  -o $(IMAGE_NAME)-fbsd main.go;mv $(IMAGE_NAME)-fbsd ../build
+	cd ../pkg;env  GOOS=linux  GOARCH=amd64  go build  -o $(IMAGE_NAME)-lnx main.go;mv $(IMAGE_NAME)-lnx ../build
 	docker build -f Dockerfile -t $(IMAGE_NAME) .. -m 4g
 	docker save -o $(IMAGE_NAME).tar $(IMAGE_NAME)
+install: 
+	export GOBIN=$GOPATH/bin
+	cd ../pkg;env  GOOS=linux  GOARCH=amd64  go install -o $(IMAGE_NAME)-lnx
 test:
 	 go test -v ../pkg/... -coverprofile cp.txt 
 	 go tool cover -html=cp.txt -o cover.html

@@ -1,0 +1,36 @@
+module multicluster-ingress-controller
+
+require (
+	github.com/davecgh/go-spew v0.0.0-20170626231645-782f4967f2dc
+	github.com/gogo/protobuf v0.0.0-20171007142547-342cbe0a0415
+	github.com/golang/protobuf v1.2.0
+	github.com/google/gofuzz v0.0.0-20170612174753-24818f796faf
+	github.com/google/uuid v1.1.1
+	github.com/googleapis/gnostic v0.0.0-20170729233727-0c5108395e2d
+	github.com/gopherjs/gopherjs v0.0.0-20190430165422-3e4dfb77656c
+	github.com/gorilla/mux v1.7.0
+	github.com/hashicorp/golang-lru v0.5.0
+	github.com/imdario/mergo v0.3.5
+	github.com/json-iterator/go v0.0.0-20180701071628-ab8a2e0c74be
+	github.com/jtolds/gls v4.20.0+incompatible
+	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
+	github.com/modern-go/reflect2 v1.0.1
+	github.com/smartystreets/assertions v0.0.0-20190401211740-f487f9de1cd3
+	github.com/smartystreets/goconvey v0.0.0-20170602164621-9e8dc3f972df
+	github.com/spf13/pflag v1.0.1
+	golang.org/x/crypto v0.0.0-20180808211826-de0752318171
+	golang.org/x/net v0.0.0-20180724234803-3673e40ba225
+	golang.org/x/oauth2 v0.0.0-20170412232759-a6bd8cefa181
+	golang.org/x/sys v0.0.0-20190225065934-cc5685c2db12
+	golang.org/x/text v0.3.0
+	golang.org/x/time v0.0.0-20161028155119-f51c12702a4d
+	google.golang.org/appengine v1.4.0
+	gopkg.in/inf.v0 v0.9.0
+	gopkg.in/yaml.v2 v2.2.2
+	k8s.io/api v0.0.0-20190226013409-f951fa7b8c72
+	k8s.io/apimachinery v0.0.0-20190223094358-dcb391cde5ca
+	k8s.io/client-go v0.0.0-20190223133742-3bc27cd87706
+	k8s.io/klog v0.2.0
+	k8s.io/utils v0.0.0-20190221042446-c2654d5206da
+	sigs.k8s.io/yaml v1.1.0
+)

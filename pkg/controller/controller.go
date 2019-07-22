@@ -178,9 +178,9 @@ func EndpointWatcher(api *KubernetesAPIServer, contr Controller) {
         go controller.Run(stop)
         return
 }
-func EndpointGet(api *KubernetesAPIServer) *v1.EndpointsList {
+func EndpointGet(api *KubernetesAPIServer, namespace string) *v1.EndpointsList {
         fmt.Println("ENDPOINT GET API: Calling kubernetes API server")
-	endpointslist, err := api.Client.Core().Endpoints("").List(metav1.ListOptions{})
+	endpointslist, err := api.Client.Core().Endpoints(namespace).List(metav1.ListOptions{})
 	if err != nil {
 		panic(err.Error())
 	}
@@ -200,6 +200,14 @@ func EndpointGet(api *KubernetesAPIServer) *v1.EndpointsList {
 	return endpointslist
 }
 
+func NamespaceGet(api *KubernetesAPIServer, namespace string, name string) *v1.Namespace {
+        fmt.Println("NAMESPACE GET API: Calling kubernetes API server")
+	obj, err := api.Client.Core().Namespaces().Get(name, metav1.GetOptions{})
+	if err != nil {
+		panic(err.Error())
+	}
+	return obj
+}
 
 func serviceEventParseAndSendData(obj interface{}, eventType string, contr Controller) {
 	objByte, err := json.Marshal(obj)
@@ -337,7 +345,7 @@ func StartController(configFile string, servers []string, events [] string){
      }
 }
 
-func GetK8sEvents(configFile string, event string) (interface{}, error){
+func GetK8sEvents(configFile string, event string, namespace string, name string) (interface{}, error){
      api, err := CreateK8sApiserverClient(configFile) 
      var message interface{}
      if (err != nil){
@@ -345,8 +353,12 @@ func GetK8sEvents(configFile string, event string) (interface{}, error){
 	return "",err
      }
      if (strings.ToLower(event) == "endpoints"){
-	message = EndpointGet(api)
+	message = EndpointGet(api, namespace)
 	fmt.Printf("ENDPOINT API: List of endpoints retrieved %s", message)
+     }
+     if (strings.ToLower(event) == "namespace"){
+	message = NamespaceGet(api, "", name)
+	fmt.Printf("NAMESPACE API: List of all namespace retrieved %s", message)
      }
      return message, err
 }
