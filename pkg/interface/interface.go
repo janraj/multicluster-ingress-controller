@@ -9,8 +9,7 @@ import (
         "time"
         "strings"
 	"fmt"
-	ctr "github.com/janraj/multicluster-ingress-controller/pkg/controller"
-	//ctr "multicluster-ingress-controller/pkg/controller"
+	ctr "multicluster-ingress-controller/pkg/controller"
 	"os"
 )
 
@@ -153,6 +152,54 @@ func KubernetesEventsHandler(r *mux.Router){
 	//     description: successful operation, list is empty.
 	r.HandleFunc(k8sEndpointPath+"/{clustername}", GetEndpoints).Methods("GET")
 	
+	// swagger:operation  GET /cic/nitro/v1/config/cluster/{clustername}/namespace/{namespace}/service/{service}/ K8sService repoList
+	// ---
+	// summary: Get the Kubernetes Service details by service name in a specific namespace
+	// description: Test Returns 200 if it success. If there is no cluster registered, Error Not Found (404) will be returned.
+	// parameters:
+	// - name: clustername
+	//   in: path
+	//   description: Name of the cluster
+	//   type: string
+	//   required: true
+	// - name: namespace
+	//   in: path
+	//   description: provides details in namespace
+	//   type: string
+	//   required: true
+	// - name: service
+	//   in: path
+	//   description: Provides service details
+	//   type: string
+	//   required: true
+	// responses:
+	//   '200':
+	//     description: successful operation
+	//   '204':
+	//     description: successful operation, list is empty.
+	r.HandleFunc(baseURL+"/cluster/{clustername}/namespace/{namespace}/service/{service}", GetService).Methods("GET")
+		// swagger:operation  GET /cic/nitro/v1/config/cluster/{clustername}/service/{service}/ K8sService repoList
+	// ---
+	// summary: Get the Kubernetes Service details by service name in a specific namespace
+	// description: Test Returns 200 if it success. If there is no cluster registered, Error Not Found (404) will be returned.
+	// parameters:
+	// - name: clustername
+	//   in: path
+	//   description: Name of the cluster
+	//   type: string
+	//   required: true
+	// - name: service
+	//   in: path
+	//   description: Provides service details
+	//   type: string
+	//   required: true
+	// responses:
+	//   '200':
+	//     description: successful operation
+	//   '204':
+	//     description: successful operation, list is empty.
+	r.HandleFunc(baseURL+"/cluster/{clustername}/service/{service}", GetService).Methods("GET")
+	
 	// swagger:operation  GET /cic/nitro/v1/config/cluster/{clustername}/namespace/{namespace} K8sNamespace repoList
 	// ---
 	// summary: Get the namespace details.
@@ -235,6 +282,47 @@ func GetNamespace(resp http.ResponseWriter, req *http.Request){
 	resp.WriteHeader(http.StatusNoContent)
 	return
 }
+
+func GetService(resp http.ResponseWriter, req *http.Request) {
+	fmt.Println("Get the details of a given service")
+
+	if clientServerList == nil {
+		fmt.Println("SERVICE GET API: There is no cluster registered")
+		resp.WriteHeader(http.StatusNoContent)
+		return
+	}
+	resp.Header().Set("Content-Type", "application/json")
+	urlArgs := strings.TrimPrefix(req.URL.Path, "/cic/nitro/v1/config/cluster/")
+	var clusterName, namespace, serviceName string
+	if strings.Contains(urlArgs, "namespace") {
+		urlSplit := strings.Split(urlArgs, "/")
+		clusterName = urlSplit[0]
+		namespace = urlSplit[2]
+		serviceName = urlSplit[4]
+	} else {
+		clusterName = strings.Split(urlArgs, "/")[0]
+		serviceName = strings.Split(urlArgs, "/service/")[1]
+		namespace = "default"
+	}
+	fmt.Println("Service: %s/%s and Cluster Name %s:", namespace, serviceName, clusterName)
+	for _,v := range clientServerList {
+		if v.ClusterName == clusterName {
+			fmt.Println("SERVICE GET API: Valid Cluster")
+			message, err := ctr.GetK8sEvents(v.ConfigFileName, "service", namespace, serviceName)
+			if err != nil {
+				resp.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			json.NewEncoder(resp).Encode(message)
+			resp.WriteHeader(http.StatusOK)
+			return
+		}
+	}
+	fmt.Println("SERVICE GET API: There is no cluster registered with the name", clusterName)
+	resp.WriteHeader(http.StatusNoContent)
+	return
+}
+
 
 func GetAllClientServer(resp http.ResponseWriter, req *http.Request){
 	fmt.Println("Get All Client Server")
@@ -347,7 +435,7 @@ func StartRestServer() (*http.Server){
        	 
 	srv := &http.Server{
                 Handler:      r,
-                Addr:         "0.0.0.0:8000",
+                Addr:         "localhost:8000",
                 ReadTimeout:  10 * time.Second,
                 WriteTimeout: 10 * time.Second,
         }
@@ -362,4 +450,3 @@ func StartRestServer() (*http.Server){
         // Graceful Shutdown
 	return srv
 }
-

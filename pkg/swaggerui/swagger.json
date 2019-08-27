@@ -18,7 +18,7 @@
     },
     "version": "1.0.0"
   },
-  "host": "0.0.0.0:8000",
+  "host": "localhost:8000",
   "basePath": "/",
   "paths": {
     "/cic/nitro/v1/config/cluster/{clustername}/namespace/{namespace}": {
@@ -41,6 +41,81 @@
             "type": "string",
             "description": "Provides namespace details",
             "name": "namespace",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation"
+          },
+          "204": {
+            "description": "successful operation, list is empty."
+          }
+        }
+      }
+    },
+    "/cic/nitro/v1/config/cluster/{clustername}/service/{service}": {
+      "get": {
+        "description": "Test Returns 200 if it success. If there is no cluster registered, Error Not Found (404) will be returned.",
+        "tags": [
+          "K8sService"
+        ],
+        "summary": "Get the service details.",
+        "operationId": "repoList",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Name of the cluster",
+            "name": "clustername",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "Provides service details",
+            "name": "service",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation"
+          },
+          "204": {
+            "description": "successful operation, list is empty."
+          }
+        }
+      }
+    },
+    "/cic/nitro/v1/config/cluster/{clustername}/namespace/{namespace}/service/{service}": {
+      "get": {
+        "description": "Test Returns 200 if it success. If there is no cluster registered, Error Not Found (404) will be returned.",
+        "tags": [
+          "K8sService"
+        ],
+        "summary": "Get the service details.",
+        "operationId": "repoList",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Name of the cluster",
+            "name": "clustername",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "Provides the scope under namespace",
+            "name": "namespace",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "Provides service details",
+            "name": "service",
             "in": "path",
             "required": true
           }
@@ -144,7 +219,9 @@
                 ],
                 "WatchEvents": [
                   "ingresses",
-                  "endpoints"
+                  "endpoints",
+                  "namespaces",
+                  "services"
                 ]
               }
             }
