@@ -360,5 +360,17 @@ func GetK8sEvents(configFile string, event string, namespace string, name string
 	message = NamespaceGet(api, "", name)
 	fmt.Printf("NAMESPACE API: List of all namespace retrieved %s", message)
      }
+     if (strings.ToLower(event) == "service"){
+		message = ServiceGet(api, namespace, name)
+		fmt.Printf("SERVICE API: service retrieved %s", message)
+     }
      return message, err
+}
+func ServiceGet(api *KubernetesAPIServer, namespace string, name string) *v1.Service {
+    fmt.Println("SERVICE GET API: Calling kubernetes API server")
+	obj, err := api.Client.Core().Services(namespace).Get(name, metav1.GetOptions{})
+	if err != nil {
+		panic(err.Error())
+	}
+	return obj
 }

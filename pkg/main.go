@@ -7,7 +7,7 @@
 // 
 //
 //     Schemes: http
-//     Host: 0.0.0.0:8000
+//     Host: localhost:8000
 //     BasePath: /
 //     Version: 1.0.0
 //     Contact: Janraj CJ<janrajcj@gmail.com> 
@@ -22,9 +22,8 @@
 package main
   
 import (
-        "log"
-	//intr "multicluster-ingress-controller/pkg/interface"
-	intr "github.com/janraj/multicluster-ingress-controller/pkg/interface"
+    "log"
+	intr "multicluster-ingress-controller/pkg/interface"
 )
 
 func InitCitrixControlPlane() error {
