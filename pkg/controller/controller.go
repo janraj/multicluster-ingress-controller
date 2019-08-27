@@ -209,6 +209,14 @@ func NamespaceGet(api *KubernetesAPIServer, namespace string, name string) *v1.N
 	return obj
 }
 
+func ServiceGet(api *KubernetesAPIServer, namespace string, name string) *v1.Service {
+    fmt.Println("SERVICE GET API: Calling kubernetes API server")
+	obj, err := api.Client.Core().Services(namespace).Get(name, metav1.GetOptions{})
+	if err != nil {
+		panic(err.Error())
+	}
+	return obj
+}
 func serviceEventParseAndSendData(obj interface{}, eventType string, contr Controller) {
 	objByte, err := json.Marshal(obj)
         if err != nil {
@@ -365,12 +373,4 @@ func GetK8sEvents(configFile string, event string, namespace string, name string
 		fmt.Printf("SERVICE API: service retrieved %s", message)
      }
      return message, err
-}
-func ServiceGet(api *KubernetesAPIServer, namespace string, name string) *v1.Service {
-    fmt.Println("SERVICE GET API: Calling kubernetes API server")
-	obj, err := api.Client.Core().Services(namespace).Get(name, metav1.GetOptions{})
-	if err != nil {
-		panic(err.Error())
-	}
-	return obj
 }

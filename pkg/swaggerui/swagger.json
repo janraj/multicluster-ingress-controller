@@ -219,7 +219,9 @@
                 ],
                 "WatchEvents": [
                   "ingresses",
-                  "endpoints"
+                  "endpoints",
+                  "namespaces",
+                  "services"
                 ]
               }
             }
