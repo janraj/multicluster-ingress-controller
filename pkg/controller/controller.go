@@ -349,16 +349,16 @@ func GetK8sEvents(configFile string, event string, namespace string, name string
      api, err := CreateK8sApiserverClient(configFile) 
      var message interface{}
      if (err != nil){
-	fmt.Println("Error while starting client API session")
-	return "",err
+		fmt.Println("Error while starting client API session")
+		return "",err
      }
      if (strings.ToLower(event) == "endpoints"){
-	message = EndpointGet(api, namespace)
-	fmt.Printf("ENDPOINT API: List of endpoints retrieved %s", message)
+		message = EndpointGet(api, namespace)
+		fmt.Printf("ENDPOINT API: List of endpoints retrieved %s", message)
      }
      if (strings.ToLower(event) == "namespace"){
-	message = NamespaceGet(api, "", name)
-	fmt.Printf("NAMESPACE API: List of all namespace retrieved %s", message)
+		message = NamespaceGet(api, "", name)
+		fmt.Printf("NAMESPACE API: List of all namespace retrieved %s", message)
      }
      if (strings.ToLower(event) == "service"){
 		message = ServiceGet(api, namespace, name)

@@ -283,6 +283,47 @@ func GetNamespace(resp http.ResponseWriter, req *http.Request){
 	return
 }
 
+func GetService(resp http.ResponseWriter, req *http.Request) {
+	fmt.Println("Get the details of a given service")
+
+	if clientServerList == nil {
+		fmt.Println("SERVICE GET API: There is no cluster registered")
+		resp.WriteHeader(http.StatusNoContent)
+		return
+	}
+	resp.Header().Set("Content-Type", "application/json")
+	urlArgs := strings.TrimPrefix(req.URL.Path, "/cic/nitro/v1/config/cluster/")
+	var clusterName, namespace, serviceName string
+	if strings.Contains(urlArgs, "namespace") {
+		urlSplit := strings.Split(urlArgs, "/")
+		clusterName = urlSplit[0]
+		namespace = urlSplit[2]
+		serviceName = urlSplit[4]
+	} else {
+		clusterName = strings.Split(urlArgs, "/")[0]
+		serviceName = strings.Split(urlArgs, "/service/")[1]
+		namespace = "default"
+	}
+	fmt.Println("Service: %s/%s and Cluster Name %s:", namespace, serviceName, clusterName)
+	for _,v := range clientServerList {
+		if v.ClusterName == clusterName {
+			fmt.Println("SERVICE GET API: Valid Cluster")
+			message, err := ctr.GetK8sEvents(v.ConfigFileName, "service", namespace, serviceName)
+			if err != nil {
+				resp.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			json.NewEncoder(resp).Encode(message)
+			resp.WriteHeader(http.StatusOK)
+			return
+		}
+	}
+	fmt.Println("SERVICE GET API: There is no cluster registered with the name", clusterName)
+	resp.WriteHeader(http.StatusNoContent)
+	return
+}
+
+
 func GetAllClientServer(resp http.ResponseWriter, req *http.Request){
 	fmt.Println("Get All Client Server")
 
@@ -409,43 +450,3 @@ func StartRestServer() (*http.Server){
         // Graceful Shutdown
 	return srv
 }
-func GetService(resp http.ResponseWriter, req *http.Request) {
-	fmt.Println("Get the details of a given service")
-
-	if clientServerList == nil {
-		fmt.Println("SERVICE GET API: There is no cluster registered")
-		resp.WriteHeader(http.StatusNoContent)
-		return
-	}
-	resp.Header().Set("Content-Type", "application/json")
-	urlArgs := strings.TrimPrefix(req.URL.Path, "/cic/nitro/v1/config/cluster/")
-	var clusterName, namespace, serviceName string
-	if strings.Contains(urlArgs, "namespace") {
-		urlSplit := strings.Split(urlArgs, "/")
-		clusterName = urlSplit[0]
-		namespace = urlSplit[2]
-		serviceName = urlSplit[4]
-	} else {
-		clusterName = strings.Split(urlArgs, "/")[0]
-		serviceName = strings.Split(urlArgs, "/service/")[1]
-		namespace = "default"
-	}
-	fmt.Println("Service: %s/%s and Cluster Name %s:", namespace, serviceName, clusterName)
-	for _,v := range clientServerList {
-		if v.ClusterName == clusterName {
-			fmt.Println("SERVICE GET API: Valid Cluster")
-			message, err := ctr.GetK8sEvents(v.ConfigFileName, "service", namespace, serviceName)
-			if err != nil {
-				resp.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			json.NewEncoder(resp).Encode(message)
-			resp.WriteHeader(http.StatusOK)
-			return
-		}
-	}
-	fmt.Println("SERVICE GET API: There is no cluster registered with the name", clusterName)
-	resp.WriteHeader(http.StatusNoContent)
-	return
-}
-
