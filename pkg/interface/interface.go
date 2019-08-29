@@ -419,6 +419,8 @@ func PostClientServer(resp http.ResponseWriter, req *http.Request){
 	
 
 func StartRestServer() (*http.Server){
+	platform := os.Getenv("PLATFORM")
+	address := "localhost"
 	fmt.Println("Staring the REST Server")
         // Create Server and Route Handlers
         r := mux.NewRouter()
@@ -426,20 +428,18 @@ func StartRestServer() (*http.Server){
 	if err != nil {
 		klog.Error(err)
 	}
-
+	if (platform == "Container"){
+		address = "0.0.0.0"
+	}
 	r.PathPrefix("/swagger/").Handler(http.StripPrefix("/swagger/", http.FileServer(http.Dir(dir+"/swaggerui"))))
-	
-
 	CreateClientServerHandler(r)
         KubernetesEventsHandler(r)	
-       	 
 	srv := &http.Server{
                 Handler:      r,
-                Addr:         "localhost:8000",
+                Addr:         address+":8000",
                 ReadTimeout:  10 * time.Second,
                 WriteTimeout: 10 * time.Second,
         }
-
         // Start Server
         go func() {
                 klog.Info("Starting MultiCluster Ingress Rest Interface at", srv.Addr)
