@@ -3,7 +3,7 @@ IMAGE_NAME=citrix-k8s-multicluster-ingress-controller
 version=1.1.0
 .PHONY: build
 build:
-	cd ../pkg;go build  -o $(IMAGE_NAME) main.go;mv $(IMAGE_NAME) ../bin/mac/
+	cd ../pkg;go build  -o $(IMAGE_NAME) main.go;mv $(IMAGE_NAME) ../build
 	cd ../pkg;env  GOOS=freebsd  GOARCH=amd64  go build  -o $(IMAGE_NAME) main.go;mv $(IMAGE_NAME) ../bin/freebsd/
 	cd ../pkg;env  GOOS=linux  GOARCH=amd64  go build  -o $(IMAGE_NAME) main.go;mv $(IMAGE_NAME) ../bin/linux/
 	docker build -f Dockerfile -t $(IMAGE_NAME) .. -m 4g
