@@ -19,7 +19,9 @@ func InitClientServer(){
 
 type createClientServer struct {
     	ClusterName string 
-    	ConfigFileName string 
+    	ConfigFileName string
+    	KubeURL string
+    	KubeServAcctToken string 
     	ServerURL []string 
     	WatchEvents []string 
 }
@@ -234,10 +236,10 @@ func GetEndpoints(resp http.ResponseWriter, req *http.Request){
     	resp.Header().Set("Content-Type", "application/json")
 	clusterName := strings.TrimPrefix(req.URL.Path, "/cic/nitro/v1/config/endpoints/")
         fmt.Println("ENDPOINT: cluster Name input:", clusterName)
-	for id := range clientServerList {
-       		if (clientServerList[id].ClusterName == clusterName){
-			fmt.Println("ENDPOINT GET API: Valid Cluster")
-			message, err := ctr.GetK8sEvents(clientServerList[id].ConfigFileName, "endpoints", "", "")
+	for _, v  := range clientServerList {
+       		if (v.ClusterName == clusterName){
+			fmt.Println("ENDPOINT GET API: Valid Cluster") 
+			message, err := ctr.GetK8sEvents(v.ConfigFileName, v.KubeURL, v.KubeServAcctToken, "endpoints", "", "")
 			if (err != nil) {
 				resp.WriteHeader(http.StatusInternalServerError)
 				return 
@@ -246,7 +248,7 @@ func GetEndpoints(resp http.ResponseWriter, req *http.Request){
 			resp.WriteHeader(http.StatusOK)
 			return 
 		} 
-    	}
+    }
 	fmt.Println("ENDPOINT GET API: There is no cluster registered with the name",clusterName)
 	resp.WriteHeader(http.StatusNoContent)
 	return
@@ -265,10 +267,10 @@ func GetNamespace(resp http.ResponseWriter, req *http.Request){
 	clusterName := strings.Split(urlArgs, "/")[0]
 	namespacename := strings.Split(urlArgs, "/namespace/")[1]
         fmt.Println("NAMESPACE: Namespace and CLuster Name:", namespacename, clusterName)
-	for id := range clientServerList {
-       		if (clientServerList[id].ClusterName == clusterName){
+	for _, v := range clientServerList {
+       		if (v.ClusterName == clusterName){
 			fmt.Println("NAMESPACE GET API: Valid Cluster")
-			message, err := ctr.GetK8sEvents(clientServerList[id].ConfigFileName, "namespace", "", namespacename)
+			message, err := ctr.GetK8sEvents(v.ConfigFileName, v.KubeURL, v.KubeServAcctToken, "namespace", "", namespacename)
 			if (err != nil) {
 				resp.WriteHeader(http.StatusInternalServerError)
 				return 
@@ -308,7 +310,7 @@ func GetService(resp http.ResponseWriter, req *http.Request) {
 	for _,v := range clientServerList {
 		if v.ClusterName == clusterName {
 			fmt.Println("SERVICE GET API: Valid Cluster")
-			message, err := ctr.GetK8sEvents(v.ConfigFileName, "service", namespace, serviceName)
+			message, err := ctr.GetK8sEvents(v.ConfigFileName, v.KubeURL, v.KubeServAcctToken, "service", namespace, serviceName)
 			if err != nil {
 				resp.WriteHeader(http.StatusInternalServerError)
 				return
@@ -354,6 +356,7 @@ func UpdateClientServer(resp http.ResponseWriter, req *http.Request){
 	for id := range clientServerList {
        		if (clientServerList[id].ClusterName == newdata.ClusterName){
 			fmt.Println("Entity is Exist, Updating the entity")
+			clientServerList[id] = newdata
 			resp.WriteHeader(http.StatusOK)
 			return 
 		} 
@@ -411,7 +414,8 @@ func PostClientServer(resp http.ResponseWriter, req *http.Request){
 	fmt.Printf("Dump Complete Struture=%v", clientServerList)
 	spew.Dump(clientServerList)
 	resp.WriteHeader(http.StatusOK)
-        ctr.StartController(newdata.ConfigFileName, newdata.ServerURL, newdata.WatchEvents)	
+	ctr.StartController(newdata.ConfigFileName, newdata.KubeURL, newdata.KubeServAcctToken,
+		newdata.ServerURL, newdata.WatchEvents)	
 	return
 }
 

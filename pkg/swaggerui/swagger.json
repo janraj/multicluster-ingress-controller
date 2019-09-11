@@ -155,8 +155,7 @@
             "schema": {
               "type": "object",
               "required": [
-                "ClusterName",
-                "ConfigFileName"
+                "ClusterName"
               ],
               "properties": {
                 "ClusterName": {
@@ -164,11 +163,19 @@
                 },
                 "ConfigFileName": {
                   "type": "string"
+                },
+                "KubeURL": {
+                  "type": "string"
+                },
+                "KubeServAcctToken": {
+                  "type": "string"
                 }
               },
               "example": {
                 "ClusterName": "ClusterABC",
-                "ConfigFileName": "/home/.kube/config"
+                "ConfigFileName": "",
+                "KubeURL": "https://10.102.33.39:6443",
+                "KubeServAcctToken": "eyJhbGciOiJSUzI1NiIsImtpZCI6IiJ9.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJkZWZhdWx0Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZWNyZXQubmFtZSI6ImNweC10b2tlbi0ydDUyZiIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VydmljZS1hY2NvdW50Lm5hbWUiOiJjcHgiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC51aWQiOiI2MzI3YjNkOS1jYTMxLTExZTktYTVkYy04ZTMwZTE2YzgxNDMiLCJzdWIiOiJzeXN0ZW06c2VydmljZWFjY291bnQ6ZGVmYXVsdDpjcHgifQ.WzlELBsPvBYRM0v6EzEfCRZ8Bohq1RPZrrL2Olsz-4sSjEyaU0jcWUmsOAM16zLaaxwadXvz6BBC1Fsjf3xc948IAOty6s5Bif3EBTpPeInhGRbj7aaEwh0OgltIJ5X4e7E1F1bDfr3zURfhBK0W6i4D33ZlysUONePpmljfGJIoDIn-BmoAKMsXN_MvjMFeb2eYmlL-RGomwpwPNAWiC5DVdA0YLZAfwF-_YagYLfHFWN-yqBb1lxw0Z3dK7wusiW2x24SNJbjoCQyM3sABK3Bq99ZyYV1sm5yvXsqXCm08CbfODEl0b47pb3aOmh2FtWVhBiTfQ33eRCTWTLiE8g"
               }
             }
           }
@@ -180,11 +187,11 @@
         }
       },
       "post": {
-        "description": "Cluster Name can be any string. ConfigFileName must include relative path of kubernetes config file. ClusterName and ClusterFileName are mandatory argument.",
+        "description": "Cluster Name can be any string. ConfigFileName must include relative path of kubernetes config file. KubeURL and KubeServAcctToken are kubernetes URL and Kubernetes Service Account Token respectively. KubeURL and KubeServAcctToken will be valid only when ConfigFileName is \"\". KubeURL and KubeServAcctToken will not be accounted if ConfigFileName is specified. ClusterName is a mandatory argument. Either ConfigFileName or (KubeURL and KubeServAcctToken) is mandatory.",
         "tags": [
           "ClusterRegistration"
         ],
-        "summary": "This API adds cluster details which include cluster name, config path and list of servers.",
+        "summary": "This API adds cluster details which include cluster name, (config path or kubernetes Service account Token) and list of servers.",
         "operationId": "createClientServer",
         "parameters": [
           {
@@ -203,6 +210,12 @@
                 "ConfigFileName": {
                   "type": "string"
                 },
+                "KubeURL": {
+                  "type": "string"
+                },
+                "KubeServAcctToken": {
+                  "type": "string"
+                },
                 "ServerURL": {
                   "type": "array"
                 },
@@ -213,6 +226,8 @@
               "example": {
                 "ClusterName": "ClusterABC",
                 "ConfigFileName": "/home/.kube/config",
+                "KubeURL": "https://10.102.33.39:6443",
+                "KubeServAcctToken": "eyJhbGciOiJSUzI1NiIsImtpZCI6IiJ9.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJkZWZhdWx0Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZWNyZXQubmFtZSI6ImNweC10b2tlbi0ydDUyZiIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VydmljZS1hY2NvdW50Lm5hbWUiOiJjcHgiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC51aWQiOiI2MzI3YjNkOS1jYTMxLTExZTktYTVkYy04ZTMwZTE2YzgxNDMiLCJzdWIiOiJzeXN0ZW06c2VydmljZWFjY291bnQ6ZGVmYXVsdDpjcHgifQ.WzlELBsPvBYRM0v6EzEfCRZ8Bohq1RPZrrL2Olsz-4sSjEyaU0jcWUmsOAM16zLaaxwadXvz6BBC1Fsjf3xc948IAOty6s5Bif3EBTpPeInhGRbj7aaEwh0OgltIJ5X4e7E1F1bDfr3zURfhBK0W6i4D33ZlysUONePpmljfGJIoDIn-BmoAKMsXN_MvjMFeb2eYmlL-RGomwpwPNAWiC5DVdA0YLZAfwF-_YagYLfHFWN-yqBb1lxw0Z3dK7wusiW2x24SNJbjoCQyM3sABK3Bq99ZyYV1sm5yvXsqXCm08CbfODEl0b47pb3aOmh2FtWVhBiTfQ33eRCTWTLiE8g",
                 "ServerURL": [
                   "http://22.22.22.22",
                   "http://127.0.0.1:9000/"
@@ -248,20 +263,15 @@
             "schema": {
               "type": "object",
               "required": [
-                "ClusterName",
-                "ConfigFileName"
+                "ClusterName"  
               ],
               "properties": {
                 "ClusterName": {
                   "type": "string"
-                },
-                "ConfigFileName": {
-                  "type": "string"
                 }
               },
               "example": {
-                "ClusterName": "ClusterABC",
-                "ConfigFileName": "/home/.kube/config"
+                "ClusterName": "ClusterABC"
               }
             }
           }
