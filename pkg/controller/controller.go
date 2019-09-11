@@ -48,24 +48,45 @@ func GenerateUUID() string {
 	s := uuid.String()
 	return s
 }
+// This function provides the kube client config file with the provided inputs
+func getConfig(configFile, kubeURL, kubeServAcctToken string) (*restclient.Config, error) {
+	if (configFile != "") {
+		config, err = clientcmd.BuildConfigFromFlags("", configFile)
+		if err != nil {
+			klog.Error("[ERROR] Did not find valid kube config info")
+			return nil, err
+		}
+		return config, err
+	}else {
+		if configFile == "" && kubeURL == "" && kubeServAcctToken == "" {
+			config, err = clientcmd.BuildConfigFromFlags("", "")
+			if err != nil {
+				klog.Error("[WARNING] Citrix Node Controller Failed to create a Client")
+				return nil, err
+			}
+			return config, err
+		} else {
+			/* A valid KubeURL and Token scenario as the validation for the integrity
+			   of input Kube parameters are done at validateKubeClusterFields()
+			 */
+			return &restclient.Config{
+				Host: kubeURL,
+				BearerToken: kubeServAcctToken,
+				TLSClientConfig: restclient.TLSClientConfig{Insecure: true},
+			}, nil
+		}
+	}
+}
 
 //This API creates Kubernetes client session. API requires config file. If file is not in default location, provide with path of the file.
-func CreateK8sApiserverClient(configFile string) (*KubernetesAPIServer, error) {
+func CreateK8sApiserverClient(configFile , kubeURL, kubeServAcctToken string) (*KubernetesAPIServer, error) {
         klog.Info("[INFO] Creating API Client", configFile)
         api := &KubernetesAPIServer{}
-	if (configFile != "") {
-                config, err = clientcmd.BuildConfigFromFlags("", configFile)
-                if err != nil {
-                        klog.Error("[ERROR] Did not find valid kube config info")
+		config, err := getConfig(configFile, kubeURL, kubeServAcctToken)
+		if err != nil {
+			klog.Error("[ERROR] Failed to obtain Kubernetes Config")
 			return nil, err
-                }
-	}else {
-        	config, err = clientcmd.BuildConfigFromFlags("", "")
-        	if err != nil {
-                	klog.Error("[WARNING] Citrix Node Controller Failed to create a Client")
-			return nil, err
-        	}
-	}
+		}
 
         client, err := kubernetes.NewForConfig(config)
         if err != nil {
@@ -324,11 +345,37 @@ func sendData(data *bytes.Buffer, contr Controller){
 	}
 	//servers.mux.Unlock()
 }
-func StartController(configFile string, servers []string, events [] string){
-     api, err := CreateK8sApiserverClient(configFile) 
+func validateKubeClusterFields(configFile, kubeURL, kubeServAcctToken string) bool {
+	if configFile == "" && kubeURL == "" && kubeServAcctToken == "" {
+		fmt.Println("Using inbuilt POD values field for Kube client configuration")
+		return true
+	}
+	if configFile == "" && kubeURL != "" && kubeServAcctToken != "" {
+		fmt.Println("Using kubeURL and kubeServAcctToken field for Kube Client configuration")
+		return true
+	}
+	if configFile != "" {
+		fmt.Println("Using configFile for configuration")
+		return true
+	}
+	if configFile == "" && kubeURL != "" && kubeServAcctToken == "" {
+		fmt.Println("Kubernetes Cluster Service Account Token Not Present: Connection Parameters invalid")
+		return false
+	}
+	if configFile == "" && kubeURL == "" && kubeServAcctToken != "" {
+		fmt.Println("Kubernetes Cluster URL Not Present: Connection Parameters invalid")
+		return false
+	}
+	return false
+}
+func StartController(configFile, kubeURL, kubeServAcctToken string, servers []string, events [] string){
+	 if !validateKubeClusterFields(configFile, kubeURL, kubeServAcctToken) {
+	 	 return
+	 }
+     api, err := CreateK8sApiserverClient(configFile, kubeURL, kubeServAcctToken) 
      if (err != nil){
-	fmt.Println("Error while starting client API session")
-	return
+		 fmt.Println("Error while starting client API session")
+		 return
      }
      contr := Controller{}
      contr.Api = api
@@ -353,8 +400,8 @@ func StartController(configFile string, servers []string, events [] string){
      }
 }
 
-func GetK8sEvents(configFile string, event string, namespace string, name string) (interface{}, error){
-     api, err := CreateK8sApiserverClient(configFile) 
+func GetK8sEvents(configFile, kubeURL, kubeServAcctToken, event, namespace, name string) (interface{}, error){
+     api, err := CreateK8sApiserverClient(configFile, kubeURL, kubeServAcctToken) 
      var message interface{}
      if (err != nil){
 		fmt.Println("Error while starting client API session")
