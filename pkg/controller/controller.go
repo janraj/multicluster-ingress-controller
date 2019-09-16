@@ -7,7 +7,7 @@ import (
         "encoding/json"
         "fmt"
         "k8s.io/api/core/v1"
-        metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+        metav1 "k8s.io/apimachinery/pkg/apis/meta/v1" 
         "k8s.io/apimachinery/pkg/fields"
         "k8s.io/client-go/kubernetes"
         restclient "k8s.io/client-go/rest"
@@ -19,6 +19,15 @@ import (
         "path/filepath"
 	"net/http"
 	"strings"
+	"errors"
+)
+
+const (
+	endpoints string = "endpoints"
+	services string = "services"
+	pods string = "pods"
+	secrets string = "secrets"
+	ingresses string = "ingresses"
 )
 
 var (
@@ -48,24 +57,47 @@ func GenerateUUID() string {
 	s := uuid.String()
 	return s
 }
+// This function provides the kube client config file with the provided inputs
+func getConfig(configFile, kubeURL, kubeServAcctToken string) (*restclient.Config, error) {
+	if (configFile != "") {
+		config, err = clientcmd.BuildConfigFromFlags("", configFile)
+		if err != nil {
+			klog.Error("[ERROR] Did not find valid kube config info")
+			return nil, err
+		}
+		return config, err
+	}else {
+		if configFile == "" && kubeURL == "" && kubeServAcctToken == "" {
+			config, err = clientcmd.BuildConfigFromFlags("", "")
+			if err != nil {
+				klog.Error("[WARNING] Citrix Node Controller Failed to create a Client")
+				return nil, err
+			}
+			return config, err
+		} else {
+			/* A valid KubeURL and Token scenario as the validation for the integrity
+			   of input Kube parameters are done at validateKubeClusterFields()
+			 */
+			return &restclient.Config{
+				Host: kubeURL,
+				BearerToken: kubeServAcctToken,
+				TLSClientConfig: restclient.TLSClientConfig{Insecure: true},
+			}, nil
+		}
+	}
+}
 
-//This API creates Kubernetes client session. API requires config file. If file is not in default location, provide with path of the file.
-func CreateK8sApiserverClient(configFile string) (*KubernetesAPIServer, error) {
+/* This API creates Kubernetes client session. API requires config file or Kubernetes URL and Kubernetes Service Account Token.
+ * If file is not in default location, provide with path of the file.
+ */
+func CreateK8sApiserverClient(configFile , kubeURL, kubeServAcctToken string) (*KubernetesAPIServer, error) {
         klog.Info("[INFO] Creating API Client", configFile)
         api := &KubernetesAPIServer{}
-	if (configFile != "") {
-                config, err = clientcmd.BuildConfigFromFlags("", configFile)
-                if err != nil {
-                        klog.Error("[ERROR] Did not find valid kube config info")
+		config, err := getConfig(configFile, kubeURL, kubeServAcctToken)
+		if err != nil {
+			klog.Error("[ERROR] Failed to obtain Kubernetes Config")
 			return nil, err
-                }
-	}else {
-        	config, err = clientcmd.BuildConfigFromFlags("", "")
-        	if err != nil {
-                	klog.Error("[WARNING] Citrix Node Controller Failed to create a Client")
-			return nil, err
-        	}
-	}
+		}
 
         client, err := kubernetes.NewForConfig(config)
         if err != nil {
@@ -178,6 +210,35 @@ func EndpointWatcher(api *KubernetesAPIServer, contr Controller) {
         go controller.Run(stop)
         return
 }
+
+func GetKubeEndpointsAll(api *KubernetesAPIServer) *v1.EndpointsList {
+	fmt.Println("SECRET GET ALL API: Calling kubernetes API server")
+	obj, err := api.Client.Core().Endpoints(metav1.NamespaceAll).List(metav1.ListOptions{})
+	if err != nil {
+		panic(err.Error())
+	}
+	return obj
+}
+
+
+func GetKubeEndpointsNamespace(api *KubernetesAPIServer, namespace string) *v1.EndpointsList {
+	fmt.Println("SECRET GET ALL API: Calling kubernetes API server")
+	obj, err := api.Client.Core().Endpoints(namespace).List(metav1.ListOptions{})
+	if err != nil {
+		panic(err.Error())
+	}
+	return obj
+}
+
+
+func GetKubeEndpointsName(api *KubernetesAPIServer, namespace string, name string) *v1.Endpoints {
+    fmt.Println("SECRET GET API: Calling kubernetes API server")
+	obj, err := api.Client.Core().Endpoints(namespace).Get(name, metav1.GetOptions{})
+	if err != nil {
+		panic(err.Error())
+	}
+	return obj
+}
 func EndpointGet(api *KubernetesAPIServer, namespace string) *v1.EndpointsList {
         fmt.Println("ENDPOINT GET API: Calling kubernetes API server")
 	endpointslist, err := api.Client.Core().Endpoints(namespace).List(metav1.ListOptions{})
@@ -201,7 +262,7 @@ func EndpointGet(api *KubernetesAPIServer, namespace string) *v1.EndpointsList {
 }
 
 func NamespaceGet(api *KubernetesAPIServer, namespace string, name string) *v1.Namespace {
-        fmt.Println("NAMESPACE GET API: Calling kubernetes API server")
+        fmt.Println("NAMESPACE Name GET API: Calling kubernetes API server")
 	obj, err := api.Client.Core().Namespaces().Get(name, metav1.GetOptions{})
 	if err != nil {
 		panic(err.Error())
@@ -209,8 +270,115 @@ func NamespaceGet(api *KubernetesAPIServer, namespace string, name string) *v1.N
 	return obj
 }
 
+func GetKubePodsAll(api *KubernetesAPIServer) *v1.PodList {
+	fmt.Println("POD GET ALL API: Calling kubernetes API server")
+	obj, err := api.Client.Core().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
+	if err != nil {
+		panic(err.Error())
+	}
+	return obj
+}
+
+
+func GetKubePodsNamespace(api *KubernetesAPIServer, namespace string) *v1.PodList {
+	fmt.Println("POD GET NAMESPACE API: Calling kubernetes API server")
+	obj, err := api.Client.Core().Pods(namespace).List(metav1.ListOptions{})
+	if err != nil {
+		panic(err.Error())
+	}
+	return obj
+}
+
+
+func GetKubePodsName(api *KubernetesAPIServer, namespace string, name string) *v1.Pod {
+    fmt.Println("POD GET Name API: Calling kubernetes API server")
+	obj, err := api.Client.Core().Pods(namespace).Get(name, metav1.GetOptions{})
+	if err != nil {
+		panic(err.Error())
+	}
+	return obj
+}
+
+func GetKubeSecretsAll(api *KubernetesAPIServer) *v1.SecretList {
+	fmt.Println("SECRET GET ALL API: Calling kubernetes API server")
+	obj, err := api.Client.Core().Secrets(metav1.NamespaceAll).List(metav1.ListOptions{})
+	if err != nil {
+		panic(err.Error())
+	}
+	return obj
+}
+
+
+func GetKubeSecretsNamespace(api *KubernetesAPIServer, namespace string) *v1.SecretList {
+	fmt.Println("SECRET Namespace GET API: Calling kubernetes API server")
+	obj, err := api.Client.Core().Secrets(namespace).List(metav1.ListOptions{})
+	if err != nil {
+		panic(err.Error())
+	}
+	return obj
+}
+
+
+func GetKubeSecretsName(api *KubernetesAPIServer, namespace string, name string) *v1.Secret {
+    fmt.Println("SECRET Name GET API: Calling kubernetes API server")
+	obj, err := api.Client.Core().Secrets(namespace).Get(name, metav1.GetOptions{})
+	if err != nil {
+		panic(err.Error())
+	}
+	return obj
+}
+
+func GetKubeIngressesAll(api *KubernetesAPIServer) *v1beta1.IngressList {
+	fmt.Println("INGRESS GET ALL API: Calling kubernetes API server")
+	obj, err := api.Client.ExtensionsV1beta1().Ingresses(metav1.NamespaceAll).List(metav1.ListOptions{})
+	if err != nil {
+		panic(err.Error())
+	}
+	return obj
+}
+
+
+func GetKubeIngressesNamespace(api *KubernetesAPIServer, namespace string) *v1beta1.IngressList {
+	fmt.Println("INGRESS Namespace GET API: Calling kubernetes API server")
+	obj, err := api.Client.ExtensionsV1beta1().Ingresses(namespace).List(metav1.ListOptions{})
+	if err != nil {
+		panic(err.Error())
+	}
+	return obj
+}
+
+
+func GetKubeIngressesName(api *KubernetesAPIServer, namespace string, name string) *v1beta1.Ingress {
+    fmt.Println("INGRESS Name GET API: Calling kubernetes API server")
+	obj, err := api.Client.ExtensionsV1beta1().Ingresses(namespace).Get(name, metav1.GetOptions{})
+	if err != nil {
+		panic(err.Error())
+	}
+	return obj
+}
+func GetKubeServicesAll(api *KubernetesAPIServer) *v1.ServiceList {
+	fmt.Println("SERVICE GET ALL API: Calling kubernetes API server")
+	obj, err := api.Client.Core().Services(metav1.NamespaceAll).List(metav1.ListOptions{})
+	if err != nil {
+		panic(err.Error())
+	}
+	return obj
+}
+func GetKubeServicesNamespace(api *KubernetesAPIServer, namespace string) *v1.ServiceList {
+	fmt.Println("SERVICE Namespace GET ALL API: Calling kubernetes API server")
+	obj, err := api.Client.Core().Services(namespace).List(metav1.ListOptions{})
+	if err != nil {
+		panic(err.Error())
+	}
+	return obj
+}
+
+func GetKubeServicesName(api *KubernetesAPIServer, namespace string, name string) *v1.Service {
+	return ServiceGet(api, namespace, name)
+}
+
 func ServiceGet(api *KubernetesAPIServer, namespace string, name string) *v1.Service {
-    fmt.Println("SERVICE GET API: Calling kubernetes API server")
+    fmt.Println("SERVICE Name GET API: Calling kubernetes API server")
 	obj, err := api.Client.Core().Services(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		panic(err.Error())
@@ -324,11 +492,40 @@ func sendData(data *bytes.Buffer, contr Controller){
 	}
 	//servers.mux.Unlock()
 }
-func StartController(configFile string, servers []string, events [] string){
-     api, err := CreateK8sApiserverClient(configFile) 
+func validateKubeClusterFields(configFile, kubeURL, kubeServAcctToken string) (bool, string) {
+	if configFile == "" && kubeURL == "" && kubeServAcctToken == "" {
+		fmt.Println("Service Account details are collected from POD")
+		return true, ""
+	}
+	if configFile == "" && kubeURL != "" && kubeServAcctToken != "" {
+		fmt.Println("Using kubeURL and kubeServAcctToken field for Kube Client configuration")
+		return true, ""
+	}
+	if configFile != "" {
+		fmt.Println("Using configFile for configuration")
+		return true, ""
+	}
+	if configFile == "" && kubeURL != "" && kubeServAcctToken == "" {
+		errString := "Kubernetes Cluster Service Account Token Not Present: Connection Parameters invalid"
+		fmt.Println(errString)
+		return false, errString
+	}
+	if configFile == "" && kubeURL == "" && kubeServAcctToken != "" {
+		errString := "Kubernetes Cluster URL Not Present: Connection Parameters invalid"
+		fmt.Println(errString)
+		return false, errString
+	}
+	return false, "Invalid Input Kubernetes connection Parameters"
+}
+func StartController(configFile, kubeURL, kubeServAcctToken string, servers []string, events [] string) (int, string) {
+	 status, statusString := validateKubeClusterFields(configFile, kubeURL, kubeServAcctToken)
+	 if !status  {
+	 	 return http.StatusBadRequest, statusString
+	 }
+     api, err := CreateK8sApiserverClient(configFile, kubeURL, kubeServAcctToken) 
      if (err != nil){
-	fmt.Println("Error while starting client API session")
-	return
+		 fmt.Println("Error while starting client API session")
+		 return http.StatusBadRequest, "Error while starting client API session: error: " + err.Error()
      }
      contr := Controller{}
      contr.Api = api
@@ -351,15 +548,152 @@ func StartController(configFile string, servers []string, events [] string){
 		SecretWatcher(api, contr)
          }
      }
+     return http.StatusOK, "Controller Added"
+}
+func GetKubeEvents(configFile, kubeURL, kubeServAcctToken string, event_params ...string) (interface{}, error) {
+	api, err := CreateK8sApiserverClient(configFile, kubeURL, kubeServAcctToken)
+	if (err != nil) {
+		fmt.Println("GetKubeEvents: Error while starting client API session")
+		return "",err
+	}
+	fmt.Println("GetKubeEvents: event_params ", event_params)
+	entity := event_params[0]
+	switch entity {
+		case pods:
+			return getKubePodEvents(api, event_params)
+		case ingresses:
+			return getKubeIngressEvents(api, event_params)
+		case services:
+			return getKubeServiceEvents(api, event_params)
+		case secrets:
+			return getKubeSecretEvents(api, event_params)
+		case endpoints:
+			return getKubeEndpointEvents(api, event_params)
+		default:
+			fmt.Println("Wrong type of Event_params", event_params[0])
+			return "", nil
+	}
 }
 
-func GetK8sEvents(configFile string, event string, namespace string, name string) (interface{}, error){
-     api, err := CreateK8sApiserverClient(configFile) 
+func getKubePodEvents(api *KubernetesAPIServer, event_params []string) (interface{}, error) {
+	var message interface{}
+	switch len(event_params) {
+		case 1: {
+			message = GetKubePodsAll(api)
+		}
+		case 2: {
+			namespace := event_params[1]
+			message = GetKubePodsNamespace(api, namespace)
+		}
+		case 3: {
+			namespace := event_params[1]
+			name := event_params[2]
+			message = GetKubePodsName(api, namespace, name)
+		}
+		default: {
+			fmt.Println("Wrong number of event_params", event_params)
+			return nil, errors.New("Wrong number of event_params" + strings.Join(event_params, " "))
+		}
+	}
+	return message, nil
+}
+func getKubeServiceEvents(api *KubernetesAPIServer, event_params []string) (interface{}, error) {
+	var message interface{}
+	switch len(event_params) {
+		case 1: {
+			message = GetKubeServicesAll(api)
+		}
+		case 2: {
+			namespace := event_params[1]
+			message = GetKubeServicesNamespace(api, namespace)
+		}
+		case 3: {
+			namespace := event_params[1]
+			name := event_params[2]
+			message = GetKubeServicesName(api, namespace, name)
+		}
+		default: {
+			fmt.Println("Wrong number of event_params", event_params)
+			return nil, errors.New("Wrong number of event_params" + strings.Join(event_params, " "))
+		}
+	}
+	return message, nil
+}
+func getKubeEndpointEvents(api *KubernetesAPIServer, event_params []string) (interface{}, error) {
+	var message interface{}
+	switch len(event_params) {
+		case 1: {
+			message = GetKubeEndpointsAll(api)
+		}
+		case 2: {
+			namespace := event_params[1]
+			message = GetKubeEndpointsNamespace(api, namespace)
+		}
+		case 3: {
+			namespace := event_params[1]
+			name := event_params[2]
+			message = GetKubeEndpointsName(api, namespace, name)
+		}
+		default: {
+			fmt.Println("Wrong number of event_params", event_params)
+			return nil, errors.New("Wrong number of event_params" + strings.Join(event_params, " "))
+		}
+	}
+	return message, nil
+}
+func getKubeSecretEvents(api *KubernetesAPIServer, event_params []string) (interface{}, error) {
+	var message interface{}
+	switch len(event_params) {
+		case 1: {
+			message = GetKubeSecretsAll(api)
+		}
+		case 2: {
+			namespace := event_params[1]
+			message = GetKubeSecretsNamespace(api, namespace)
+		}
+		case 3: {
+			namespace := event_params[1]
+			name := event_params[2]
+			message = GetKubeSecretsName(api, namespace, name)
+		}
+		default: {
+			fmt.Println("Wrong number of event_params", event_params)
+			return nil, errors.New("Wrong number of event_params" + strings.Join(event_params, " "))
+		}
+	}
+	return message, nil
+}
+func getKubeIngressEvents(api *KubernetesAPIServer, event_params []string) (interface{}, error) {
+	var message interface{}
+	switch len(event_params) {
+		case 1: {
+			message = GetKubeIngressesAll(api)
+		}
+		case 2: {
+			namespace := event_params[1]
+			message = GetKubeIngressesNamespace(api, namespace)
+		}
+		case 3: {
+			namespace := event_params[1]
+			name := event_params[2]
+			message = GetKubeIngressesName(api, namespace, name)
+		}
+		default: {
+			fmt.Println("Wrong number of event_params", event_params)
+			return nil, errors.New("Wrong number of event_params" + strings.Join(event_params, " "))
+		}
+	}
+	return message, nil
+}
+
+func GetK8sEvents(configFile, kubeURL, kubeServAcctToken, event, namespace, name string) (interface{}, error){
+     api, err := CreateK8sApiserverClient(configFile, kubeURL, kubeServAcctToken) 
      var message interface{}
      if (err != nil){
 		fmt.Println("Error while starting client API session")
 		return "",err
      }
+     fmt.Println("GetK8sEvents: ", event, namespace, name)
      if (strings.ToLower(event) == "endpoints"){
 		message = EndpointGet(api, namespace)
 		fmt.Printf("ENDPOINT API: List of endpoints retrieved %s", message)
