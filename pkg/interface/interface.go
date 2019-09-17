@@ -139,7 +139,6 @@ var k8sServicePath string = k8sClientPath + "/services"
 var k8sIngressPath string = k8sClientPath + "/ingresses"
 var k8sPodPath string = k8sClientPath + "/pods"
 var k8sSecretPath string = k8sClientPath + "/secrets"
-var baseURL string = "/cic/nitro/v1/config"
 func KubernetesEventsHandler(r *mux.Router){
 	
 	// swagger:operation  GET /cic/nitro/v1/config/endpoints/{clustername} K8sEndpoints repoList
@@ -490,7 +489,7 @@ func KubernetesEventsHandler(r *mux.Router){
 	//     description: successful operation
 	//   '204':
 	//     description: successful operation, list is empty.
-	r.HandleFunc(baseURL+"/cluster/{clustername}/namespace/{namespace}/service/{service}", GetService).Methods("GET")
+	r.HandleFunc(k8sClientPath+"/cluster/{clustername}/namespace/{namespace}/service/{service}", GetService).Methods("GET")
 		// swagger:operation  GET /cic/nitro/v1/config/cluster/{clustername}/service/{service}/ K8sService repoList
 	// ---
 	// summary: Get the Kubernetes Service details by service name in a specific namespace
@@ -511,7 +510,7 @@ func KubernetesEventsHandler(r *mux.Router){
 	//     description: successful operation
 	//   '204':
 	//     description: successful operation, list is empty.
-	r.HandleFunc(baseURL+"/cluster/{clustername}/service/{service}", GetService).Methods("GET")
+	r.HandleFunc(k8sClientPath+"/cluster/{clustername}/service/{service}", GetService).Methods("GET")
 	
 	// swagger:operation  GET /cic/nitro/v1/config/cluster/{clustername}/namespace/{namespace} K8sNamespace repoList
 	// ---
@@ -533,7 +532,7 @@ func KubernetesEventsHandler(r *mux.Router){
 	//     description: successful operation
 	//   '204':
 	//     description: successful operation, list is empty.
-	r.HandleFunc(baseURL+"/cluster/{clustername}/namespace/{namespace}", GetNamespace).Methods("GET")
+	r.HandleFunc(k8sClientPath+"/cluster/{clustername}/namespace/{namespace}", GetNamespace).Methods("GET")
 	
 }
 

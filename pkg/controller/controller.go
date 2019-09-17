@@ -212,7 +212,7 @@ func EndpointWatcher(api *KubernetesAPIServer, contr Controller) {
 }
 
 func GetKubeEndpointsAll(api *KubernetesAPIServer) *v1.EndpointsList {
-	fmt.Println("SECRET GET ALL API: Calling kubernetes API server")
+	fmt.Println("Endpoints GET ALL API: Calling kubernetes API server")
 	obj, err := api.Client.Core().Endpoints(metav1.NamespaceAll).List(metav1.ListOptions{})
 	if err != nil {
 		panic(err.Error())
@@ -222,7 +222,7 @@ func GetKubeEndpointsAll(api *KubernetesAPIServer) *v1.EndpointsList {
 
 
 func GetKubeEndpointsNamespace(api *KubernetesAPIServer, namespace string) *v1.EndpointsList {
-	fmt.Println("SECRET GET ALL API: Calling kubernetes API server")
+	fmt.Println("Endpoints GET ALL API: Calling kubernetes API server")
 	obj, err := api.Client.Core().Endpoints(namespace).List(metav1.ListOptions{})
 	if err != nil {
 		panic(err.Error())
@@ -232,7 +232,7 @@ func GetKubeEndpointsNamespace(api *KubernetesAPIServer, namespace string) *v1.E
 
 
 func GetKubeEndpointsName(api *KubernetesAPIServer, namespace string, name string) *v1.Endpoints {
-    fmt.Println("SECRET GET API: Calling kubernetes API server")
+    fmt.Println("Endpoints GET API: Calling kubernetes API server")
 	obj, err := api.Client.Core().Endpoints(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		panic(err.Error())
