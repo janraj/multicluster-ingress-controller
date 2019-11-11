@@ -141,7 +141,17 @@ func secretEventParseAndSendData(obj interface{}, eventType string, contr Contro
 	parseAndSendData(string (message), objJson.ObjectMeta,  obj.(*v1.Secret).TypeMeta, "Secret", eventType, contr)
 
 }
-func IngressWatcher(api *KubernetesAPIServer, contr Controller) {
+func IngressWatcher(api *KubernetesAPIServer, contr Controller, Namespace []string) {
+	if len(Namespace) == 0 {
+		IngressWatchAllNamespace(api, contr)
+	}else {
+                IngressWatchPerNamespace(api, contr, Namespace)	
+	}
+        return
+}
+
+func IngressWatchAllNamespace(api *KubernetesAPIServer, contr Controller) {
+        klog.Info("[INFO] Watch Ingress for all the namespaces")
         ingressListWatcher := cache.NewListWatchFromClient(api.Client.ExtensionsV1beta1().RESTClient(), "ingresses", v1.NamespaceAll, fields.Everything())
         _, controller := cache.NewInformer(ingressListWatcher, &v1beta1.Ingress{}, 0, cache.ResourceEventHandlerFuncs{
                 AddFunc: func(obj interface{}) {
@@ -159,7 +169,39 @@ func IngressWatcher(api *KubernetesAPIServer, contr Controller) {
         go controller.Run(stop)
         return
 }
-func SecretWatcher(api *KubernetesAPIServer, contr Controller) {
+
+func IngressWatchPerNamespace(api *KubernetesAPIServer, contr Controller, Namespace []string) {
+        klog.Info("[INFO] Watch Ingress for following namespaces", Namespace)
+        for _, namespace := range Namespace {
+        	ingressListWatcher := cache.NewListWatchFromClient(api.Client.ExtensionsV1beta1().RESTClient(), "ingresses", namespace, fields.Everything())
+        	_, controller := cache.NewInformer(ingressListWatcher, &v1beta1.Ingress{}, 0, cache.ResourceEventHandlerFuncs{
+                	AddFunc: func(obj interface{}) {
+				ingressEventParseAndSendData(obj, "ADDED", contr)
+                	},
+                	UpdateFunc: func(obj interface{}, newobj interface{}) {
+				ingressEventParseAndSendData(newobj, "MODIFIED", contr)
+                	},
+                	DeleteFunc: func(obj interface{}) {
+				ingressEventParseAndSendData(obj, "DELETED", contr)
+                	},
+        	},
+        	)
+		stop := make(chan struct{})
+        	go controller.Run(stop)
+	}
+        return
+}
+
+func SecretWatcher(api *KubernetesAPIServer, contr Controller, Namespace []string) {
+	if len(Namespace) == 0 {
+		SecretWatchAllNamespace(api, contr)
+	}else {
+                SecretWatchPerNamespace(api, contr, Namespace)	
+	}
+        return
+}
+
+func SecretWatchAllNamespace(api *KubernetesAPIServer, contr Controller) {
         secretListWatcher := cache.NewListWatchFromClient(api.Client.Core().RESTClient(), "secrets", v1.NamespaceAll, fields.Everything())
         _, controller := cache.NewInformer(secretListWatcher, &v1.Secret{}, 0, cache.ResourceEventHandlerFuncs{
                 AddFunc: func(obj interface{}) {
@@ -177,6 +219,29 @@ func SecretWatcher(api *KubernetesAPIServer, contr Controller) {
         go controller.Run(stop)
         return
 }
+
+func SecretWatchPerNamespace(api *KubernetesAPIServer, contr Controller, Namespace []string) {
+        klog.Info("[INFO] Watch Secret events for following namespaces", Namespace)
+        for _, namespace := range Namespace {
+        	secretListWatcher := cache.NewListWatchFromClient(api.Client.Core().RESTClient(), "secrets", namespace, fields.Everything())
+        	_, controller := cache.NewInformer(secretListWatcher, &v1.Secret{}, 0, cache.ResourceEventHandlerFuncs{
+                	AddFunc: func(obj interface{}) {
+				secretEventParseAndSendData(obj, "ADDED", contr)
+                	},
+                	UpdateFunc: func(obj interface{}, newobj interface{}) {
+				secretEventParseAndSendData(newobj, "MODIFIED", contr)
+                	},
+                	DeleteFunc: func(obj interface{}) {
+				secretEventParseAndSendData(obj, "DELETED", contr)
+                	},
+        	},
+        	)
+        	stop := make(chan struct{})
+        	go controller.Run(stop)
+	}
+        return
+}
+
 func endpointEventParseAndSendData(obj interface{}, eventType string, contr Controller) {
 	objByte, err := json.Marshal(obj)
         if err != nil {
@@ -192,7 +257,16 @@ func endpointEventParseAndSendData(obj interface{}, eventType string, contr Cont
 	}
 	parseAndSendData(string (message), objJson.ObjectMeta, objJson.TypeMeta, "Endpoints", eventType, contr)
 }
-func EndpointWatcher(api *KubernetesAPIServer, contr Controller) {
+func EndpointWatcher(api *KubernetesAPIServer, contr Controller, Namespace []string) {
+	if len(Namespace) == 0 {
+		EndpointWatchAllNamespace(api, contr)
+	}else {
+                EndpointWatchPerNamespace(api, contr, Namespace)	
+	}
+        return
+}
+
+func EndpointWatchAllNamespace(api *KubernetesAPIServer, contr Controller) {
         endpointListWatcher := cache.NewListWatchFromClient(api.Client.Core().RESTClient(), "endpoints", v1.NamespaceAll, fields.Everything())
         _, controller := cache.NewInformer(endpointListWatcher, &v1.Endpoints{}, 0, cache.ResourceEventHandlerFuncs{
                 AddFunc: func(obj interface{}) {
@@ -208,6 +282,28 @@ func EndpointWatcher(api *KubernetesAPIServer, contr Controller) {
         )
         stop := make(chan struct{})
         go controller.Run(stop)
+        return
+}
+
+func EndpointWatchPerNamespace(api *KubernetesAPIServer, contr Controller, Namespace []string) {
+        klog.Info("[INFO] Watch Endpoint for following namespaces", Namespace)
+        for _, namespace := range Namespace {
+            endpointListWatcher := cache.NewListWatchFromClient(api.Client.Core().RESTClient(), "endpoints", namespace, fields.Everything())
+            _, controller := cache.NewInformer(endpointListWatcher, &v1.Endpoints{}, 0, cache.ResourceEventHandlerFuncs{
+                    AddFunc: func(obj interface{}) {
+			endpointEventParseAndSendData(obj, "ADDED", contr) 
+                    },
+                    UpdateFunc: func(obj interface{}, newobj interface{}) {
+			endpointEventParseAndSendData(newobj, "MODIFIED", contr)
+                    },
+                    DeleteFunc: func(obj interface{}) {
+			endpointEventParseAndSendData(obj, "DELETED", contr)
+                    },
+           },
+           )
+           stop := make(chan struct{})
+           go controller.Run(stop)
+	}
         return
 }
 
@@ -401,7 +497,16 @@ func serviceEventParseAndSendData(obj interface{}, eventType string, contr Contr
 	parseAndSendData(string (message), objJson.ObjectMeta, objJson.TypeMeta, "Service", eventType, contr)
 }
 
-func ServiceWatcher(api *KubernetesAPIServer, contr Controller) {
+func ServiceWatcher(api *KubernetesAPIServer, contr Controller, Namespace []string) {
+	if len(Namespace) == 0 {
+		ServiceWatchAllNamespace(api, contr)
+	}else {
+                ServiceWatchPerNamespace(api, contr, Namespace)	
+	}
+        return
+}
+
+func ServiceWatchAllNamespace(api *KubernetesAPIServer, contr Controller) {
         serviceListWatcher := cache.NewListWatchFromClient(api.Client.Core().RESTClient(), string(v1.ResourceServices), v1.NamespaceAll, fields.Everything())
         _, controller := cache.NewInformer(serviceListWatcher, &v1.Service{}, 0, cache.ResourceEventHandlerFuncs{
                 AddFunc: func(obj interface{}) {
@@ -420,6 +525,27 @@ func ServiceWatcher(api *KubernetesAPIServer, contr Controller) {
         return
 }
 
+func ServiceWatchPerNamespace(api *KubernetesAPIServer, contr Controller, Namespace []string) {
+        klog.Info("[INFO] Watch Service events for following namespaces", Namespace)
+        for _, namespace := range Namespace {
+        	serviceListWatcher := cache.NewListWatchFromClient(api.Client.Core().RESTClient(), string(v1.ResourceServices), namespace, fields.Everything())
+        	_, controller := cache.NewInformer(serviceListWatcher, &v1.Service{}, 0, cache.ResourceEventHandlerFuncs{
+                	AddFunc: func(obj interface{}) {
+				serviceEventParseAndSendData(obj, "ADDED", contr)
+                	},
+                	UpdateFunc: func(obj interface{}, newobj interface{}) {
+				serviceEventParseAndSendData(newobj, "MODIFIED", contr)
+                	},
+                	DeleteFunc: func(obj interface{}) {
+				serviceEventParseAndSendData(obj, "DELETED", contr)
+                	},
+        	},
+        	)
+        	stop := make(chan struct{})
+        	go controller.Run(stop)
+	}
+        return
+}
 
 func podEventParseAndSendData(obj interface{}, eventType string, contr Controller){
 	objByte, err := json.Marshal(obj)
@@ -437,7 +563,16 @@ func podEventParseAndSendData(obj interface{}, eventType string, contr Controlle
 	parseAndSendData(string (message), objJson.ObjectMeta, objJson.TypeMeta, "Pod", eventType, contr)
 }
 
-func PodWatcher(api *KubernetesAPIServer, contr Controller) {
+func PodWatcher(api *KubernetesAPIServer, contr Controller, Namespace []string) {
+	if len(Namespace) == 0 {
+		PodWatchAllNamespace(api, contr)
+	}else {
+                PodWatchPerNamespace(api, contr, Namespace)	
+	}
+        return
+}
+
+func PodWatchAllNamespace(api *KubernetesAPIServer, contr Controller) {
         PodListWatcher := cache.NewListWatchFromClient(api.Client.Core().RESTClient(), string(v1.ResourcePods), v1.NamespaceAll, fields.Everything())
         _, controller := cache.NewInformer(PodListWatcher, &v1.Pod{}, 0, cache.ResourceEventHandlerFuncs{
                 AddFunc: func(obj interface{}) {
@@ -453,6 +588,29 @@ func PodWatcher(api *KubernetesAPIServer, contr Controller) {
         )
         stop := make(chan struct{})
         go controller.Run(stop)
+        return
+}
+
+
+func PodWatchPerNamespace(api *KubernetesAPIServer, contr Controller, Namespace []string) {
+        klog.Info("[INFO] Watch Pods for following namespaces", Namespace)
+        for _, namespace := range Namespace {
+        	PodListWatcher := cache.NewListWatchFromClient(api.Client.Core().RESTClient(), string(v1.ResourcePods), namespace, fields.Everything())
+        	_, controller := cache.NewInformer(PodListWatcher, &v1.Pod{}, 0, cache.ResourceEventHandlerFuncs{
+                	AddFunc: func(obj interface{}) {
+				podEventParseAndSendData(obj, "ADDED", contr)
+                	},
+                	UpdateFunc: func(obj interface{}, newobj interface{}) {
+				podEventParseAndSendData(newobj, "MODIFIED", contr)
+                	},
+                	DeleteFunc: func(obj interface{}) {
+				podEventParseAndSendData(obj, "DELETED", contr)
+                	},
+        	},
+        	)
+        	stop := make(chan struct{})
+        	go controller.Run(stop)
+	}
         return
 }
 
@@ -517,11 +675,11 @@ func validateKubeClusterFields(configFile, kubeURL, kubeServAcctToken string) (b
 	}
 	return false, "Invalid Input Kubernetes connection Parameters"
 }
-func StartController(configFile, kubeURL, kubeServAcctToken string, servers []string, events [] string) (int, string) {
-	 status, statusString := validateKubeClusterFields(configFile, kubeURL, kubeServAcctToken)
-	 if !status  {
-	 	 return http.StatusBadRequest, statusString
-	 }
+func StartController(configFile, kubeURL, kubeServAcctToken string, Namespace []string, servers []string, events [] string) (int, string) {
+     status, statusString := validateKubeClusterFields(configFile, kubeURL, kubeServAcctToken)
+     if !status  {
+         return http.StatusBadRequest, statusString
+     }
      api, err := CreateK8sApiserverClient(configFile, kubeURL, kubeServAcctToken) 
      if (err != nil){
 		 fmt.Println("Error while starting client API session")
@@ -533,19 +691,19 @@ func StartController(configFile, kubeURL, kubeServAcctToken string, servers []st
      contr.EventList = events 
      for _, event := range events {
 	 if (strings.ToLower(event) == "ingresses"){
-		IngressWatcher(api, contr)
+		IngressWatcher(api, contr, Namespace)
          }
 	 if (strings.ToLower(event) == "endpoints"){
-		EndpointWatcher(api, contr)
+		EndpointWatcher(api, contr, Namespace)
          }
 	 if (strings.ToLower(event) == "pods"){
-		PodWatcher(api, contr)
+		PodWatcher(api, contr, Namespace)
          }
 	 if (strings.ToLower(event) == "services"){
-		ServiceWatcher(api, contr)
+		ServiceWatcher(api, contr, Namespace)
          }
 	 if (strings.ToLower(event) == "secrets"){
-		SecretWatcher(api, contr)
+		SecretWatcher(api, contr, Namespace)
          }
      }
      return http.StatusOK, "Controller Added"

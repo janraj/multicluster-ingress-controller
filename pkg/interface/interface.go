@@ -21,7 +21,8 @@ type createClientServer struct {
     	ClusterName string 
     	ConfigFileName string
     	KubeURL string
-    	KubeServAcctToken string 
+    	KubeServAcctToken string
+        Namespaces []string 
     	ServerURL []string 
     	WatchEvents []string 
 }
@@ -1180,7 +1181,7 @@ func PostClientServer(resp http.ResponseWriter, req *http.Request){
 	fmt.Printf("Dump Complete Struture=%v", clientServerList)
 	spew.Dump(clientServerList)
 	status, statusString := ctr.StartController(newdata.ConfigFileName, newdata.KubeURL, newdata.KubeServAcctToken,
-		newdata.ServerURL, newdata.WatchEvents)
+		newdata.Namespaces, newdata.ServerURL, newdata.WatchEvents)
 	if status == http.StatusOK {
 		clientServerList = append(clientServerList, newdata)
 	}
