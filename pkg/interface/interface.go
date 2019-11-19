@@ -1,7 +1,6 @@
 package rest
   
 import (
-	"github.com/davecgh/go-spew/spew"
 	"encoding/json"
         "github.com/gorilla/mux"
         "k8s.io/klog"
@@ -10,6 +9,8 @@ import (
         "strings"
 	"fmt"
 	ctr "multicluster-ingress-controller/pkg/controller"
+	"multicluster-ingress-controller/pkg/swaggerInterface"
+	"multicluster-ingress-controller/pkg/swaggerToKubeInterface"
 	"os"
 )
 
@@ -17,20 +18,13 @@ func InitClientServer(){
 	fmt.Println("Initializing Client Server Data Structure Which populate all k8s client and server details")
 }
 
-type createClientServer struct {
-    	ClusterName string 
-    	ConfigFileName string
-    	KubeURL string
-    	KubeServAcctToken string
-        Namespaces []string 
-    	ServerURL []string 
-    	WatchEvents []string 
-}
-var clientServerList []createClientServer
+
+var SwaggerToKubeInterfaceList []swaggerToKubeInterface.SwaggerToKubeInterface
+	 
 var routePath string = "/cic/nitro/v1/config/controller"
 func CreateClientServerHandler(r *mux.Router) {
 
-	// swagger:route GET /cic/nitro/v1/config/controller ClusterRegistration createClientServer
+	// swagger:route GET /cic/nitro/v1/config/controller ClusterRegistration swaggerInterface.CreateClientServer
    	// ---
 	// summary: This API lists all the configured entity details which incldue cluster names, config file path, watch events and the server list.
 	// description: Returns 200 if it success. If there is no registeration, Error Not Found (404) will be returned.
@@ -41,7 +35,7 @@ func CreateClientServerHandler(r *mux.Router) {
    	//     description: successful operation, list is empty.
 	r.HandleFunc(routePath, GetAllClientServer).Methods("GET")
 
-	// swagger:operation POST /cic/nitro/v1/config/controller ClusterRegistration createClientServer
+	// swagger:operation POST /cic/nitro/v1/config/controller ClusterRegistration swaggerInterface.CreateClientServer
    	// ---
 	// summary: This API adds cluster details which include cluster name, config path and list of servers.
 	// description: Cluster Name can be any string. ConfigFileName must include relative path of kubernetes config file. ClusterName and ClusterFileName are mandatory argument.
@@ -72,7 +66,7 @@ func CreateClientServerHandler(r *mux.Router) {
    	//     description: successful operation
 	r.HandleFunc(routePath, PostClientServer).Methods("POST")
 	
-	// swagger:operation DELETE /cic/nitro/v1/config/controller ClusterRegistration createClientServer
+	// swagger:operation DELETE /cic/nitro/v1/config/controller ClusterRegistration swaggerInterface.CreateClientServer
    	// ---
 	// summary: Delete the cluster details.
 	// description: If there is no entity configured, Error Not Found (404) will be returned.
@@ -100,7 +94,7 @@ func CreateClientServerHandler(r *mux.Router) {
    	//     description: entity did not find
 	r.HandleFunc(routePath, DeleteClientServer).Methods("DELETE")
 	
-	// swagger:operation PUT /cic/nitro/v1/config/controller ClusterRegistration createClientServer
+	// swagger:operation PUT /cic/nitro/v1/config/controller ClusterRegistration swaggerInterface.CreateClientServer
    	// ---
 	// summary: This API can be used for updating the entities of a configured cluster.
 	// description: If there is no matching entity, update operation cannot be performed. Error Not Found (404) will be returned.
@@ -540,7 +534,7 @@ func KubernetesEventsHandler(r *mux.Router){
 func GetEndpoints(resp http.ResponseWriter, req *http.Request){
 	fmt.Println("Get Endpoints from the cluster")
 
-	if (clientServerList == nil) {
+	if (SwaggerToKubeInterfaceList == nil) {
 		fmt.Println("ENDPOINT GET API: There is no cluster registered")
 		resp.WriteHeader(http.StatusNoContent)
 		return 
@@ -548,7 +542,8 @@ func GetEndpoints(resp http.ResponseWriter, req *http.Request){
     	resp.Header().Set("Content-Type", "application/json")
 	clusterName := strings.TrimPrefix(req.URL.Path, "/cic/nitro/v1/config/endpoints/")
         fmt.Println("ENDPOINT: cluster Name input:", clusterName)
-	for _, v  := range clientServerList {
+	for _, swgL  := range SwaggerToKubeInterfaceList {
+			v := *swgL.SwaggerClientServer
        		if (v.ClusterName == clusterName){
 			fmt.Println("ENDPOINT GET API: Valid Cluster") 
 			message, err := ctr.GetK8sEvents(v.ConfigFileName, v.KubeURL, v.KubeServAcctToken, "endpoints", "", "")
@@ -569,7 +564,7 @@ func GetEndpoints(resp http.ResponseWriter, req *http.Request){
 func GetNamespace(resp http.ResponseWriter, req *http.Request){
 	fmt.Println("Get the details of a given namespace")
 
-	if (clientServerList == nil) {
+	if (SwaggerToKubeInterfaceList == nil) {
 		fmt.Println("NAMESPACE GET API: There is no cluster registered")
 		resp.WriteHeader(http.StatusNoContent)
 		return 
@@ -579,7 +574,8 @@ func GetNamespace(resp http.ResponseWriter, req *http.Request){
 	clusterName := strings.Split(urlArgs, "/")[0]
 	namespacename := strings.Split(urlArgs, "/namespace/")[1]
         fmt.Println("NAMESPACE: Namespace and CLuster Name:", namespacename, clusterName)
-	for _, v := range clientServerList {
+	for _, swgL := range SwaggerToKubeInterfaceList {
+			v := *swgL.SwaggerClientServer
        		if (v.ClusterName == clusterName){
 			fmt.Println("NAMESPACE GET API: Valid Cluster")
 			message, err := ctr.GetK8sEvents(v.ConfigFileName, v.KubeURL, v.KubeServAcctToken, "namespace", "", namespacename)
@@ -600,7 +596,7 @@ func GetNamespace(resp http.ResponseWriter, req *http.Request){
 func GetService(resp http.ResponseWriter, req *http.Request) {
 	fmt.Println("Get the details of a given service")
 
-	if clientServerList == nil {
+	if SwaggerToKubeInterfaceList == nil {
 		fmt.Println("SERVICE GET API: There is no cluster registered")
 		resp.WriteHeader(http.StatusNoContent)
 		return
@@ -619,7 +615,8 @@ func GetService(resp http.ResponseWriter, req *http.Request) {
 		namespace = "default"
 	}
 	fmt.Println("Service: %s/%s and Cluster Name %s:", namespace, serviceName, clusterName)
-	for _,v := range clientServerList {
+	for _,swgL := range SwaggerToKubeInterfaceList {
+		v := *swgL.SwaggerClientServer
 		if v.ClusterName == clusterName {
 			fmt.Println("SERVICE GET API: Valid Cluster")
 			message, err := ctr.GetK8sEvents(v.ConfigFileName, v.KubeURL, v.KubeServAcctToken, "service", namespace, serviceName)
@@ -639,7 +636,7 @@ func GetService(resp http.ResponseWriter, req *http.Request) {
 func GetEndpointsAll(resp http.ResponseWriter, req *http.Request) {
 	fmt.Println("Get All Endpoints from the cluster")
 
-	if clientServerList == nil {
+	if SwaggerToKubeInterfaceList == nil {
 		fmt.Println("ENDPOINT ALL GET API: There is no cluster registered")
 		resp.WriteHeader(http.StatusNoContent)
 		return
@@ -647,7 +644,8 @@ func GetEndpointsAll(resp http.ResponseWriter, req *http.Request) {
 	resp.Header().Set("Content-Type", "application/json")
 	clusterName := strings.TrimPrefix(req.URL.Path, k8sEndpointPath + "/")
 	fmt.Println("ENDPOINT: cluster Name input:", clusterName)
-	for _, v := range clientServerList {
+	for _, swgL := range SwaggerToKubeInterfaceList {
+		v := *swgL.SwaggerClientServer
 		if v.ClusterName == clusterName {
 			fmt.Println("ENDPOINT ALL GET API: Valid Cluster")
 			message, err := ctr.GetKubeEvents(v.ConfigFileName, v.KubeURL, v.KubeServAcctToken, "endpoints")
@@ -667,7 +665,7 @@ func GetEndpointsAll(resp http.ResponseWriter, req *http.Request) {
 func GetEndpointsNamespace(resp http.ResponseWriter, req *http.Request) {
 	fmt.Println("Get Endpoints for Namespace from the cluster")
 
-	if clientServerList == nil {
+	if SwaggerToKubeInterfaceList == nil {
 		fmt.Println("ENDPOINT NAMESPACE GET API: There is no cluster registered")
 		resp.WriteHeader(http.StatusNoContent)
 		return
@@ -678,7 +676,8 @@ func GetEndpointsNamespace(resp http.ResponseWriter, req *http.Request) {
 	clusterName := urlArgsList[0]
 	namespace := urlArgsList[1]
 	fmt.Println("ENDPOINT: cluster Name, Namespace input:", clusterName, namespace)
-	for _, v := range clientServerList {
+	for _, swgL := range SwaggerToKubeInterfaceList {
+		v := *swgL.SwaggerClientServer
 		if v.ClusterName == clusterName {
 			fmt.Println("ENDPOINT NAMESPACE GET API: Valid Cluster")
 			message, err := ctr.GetKubeEvents(v.ConfigFileName, v.KubeURL, v.KubeServAcctToken, "endpoints", namespace)
@@ -698,7 +697,7 @@ func GetEndpointsNamespace(resp http.ResponseWriter, req *http.Request) {
 func GetEndpointsName(resp http.ResponseWriter, req *http.Request) {
 	fmt.Println("Get Endpoints for Name from the cluster")
 
-	if clientServerList == nil {
+	if SwaggerToKubeInterfaceList == nil {
 		fmt.Println("ENDPOINT NAME GET API: There is no cluster registered")
 		resp.WriteHeader(http.StatusNoContent)
 		return
@@ -710,7 +709,8 @@ func GetEndpointsName(resp http.ResponseWriter, req *http.Request) {
 	namespace := urlArgsList[1]
 	name := urlArgsList[2]
 	fmt.Println("ENDPOINT: cluster Name, Namespace, Name input:", clusterName, namespace, name)
-	for _, v := range clientServerList {
+	for _, swgL := range SwaggerToKubeInterfaceList {
+		v := *swgL.SwaggerClientServer
 		if v.ClusterName == clusterName {
 			fmt.Println("ENDPOINT NAME GET API: Valid Cluster")
 			message, err := ctr.GetKubeEvents(v.ConfigFileName, v.KubeURL, v.KubeServAcctToken, "endpoints", namespace, name)
@@ -731,7 +731,7 @@ func GetEndpointsName(resp http.ResponseWriter, req *http.Request) {
 func GetPodsAll(resp http.ResponseWriter, req *http.Request) {
 	fmt.Println("Get All Pods from the cluster")
 
-	if clientServerList == nil {
+	if SwaggerToKubeInterfaceList == nil {
 		fmt.Println("Pod ALL GET API: There is no cluster registered")
 		resp.WriteHeader(http.StatusNoContent)
 		return
@@ -739,7 +739,8 @@ func GetPodsAll(resp http.ResponseWriter, req *http.Request) {
 	resp.Header().Set("Content-Type", "application/json")
 	clusterName := strings.TrimPrefix(req.URL.Path, k8sPodPath + "/")
 	fmt.Println("Pod: cluster Name input:", clusterName)
-	for _, v := range clientServerList {
+	for _, swgL := range SwaggerToKubeInterfaceList {
+		v := *swgL.SwaggerClientServer
 		if v.ClusterName == clusterName {
 			fmt.Println("Pod ALL GET API: Valid Cluster")
 			message, err := ctr.GetKubeEvents(v.ConfigFileName, v.KubeURL, v.KubeServAcctToken, "pods")
@@ -759,7 +760,7 @@ func GetPodsAll(resp http.ResponseWriter, req *http.Request) {
 func GetPodsNamespace(resp http.ResponseWriter, req *http.Request) {
 	fmt.Println("Get Pods for Namespace from the cluster")
 
-	if clientServerList == nil {
+	if SwaggerToKubeInterfaceList == nil {
 		fmt.Println("Pod NAMESPACE GET API: There is no cluster registered")
 		resp.WriteHeader(http.StatusNoContent)
 		return
@@ -770,7 +771,8 @@ func GetPodsNamespace(resp http.ResponseWriter, req *http.Request) {
 	clusterName := urlArgsList[0]
 	namespace := urlArgsList[1]
 	fmt.Println("Pod: cluster Name, Namespace input:", clusterName, namespace)
-	for _, v := range clientServerList {
+	for _, swgL := range SwaggerToKubeInterfaceList {
+		v := *swgL.SwaggerClientServer
 		if v.ClusterName == clusterName {
 			fmt.Println("Pod NAMESPACE GET API: Valid Cluster")
 			message, err := ctr.GetKubeEvents(v.ConfigFileName, v.KubeURL, v.KubeServAcctToken, "pods", namespace)
@@ -790,19 +792,21 @@ func GetPodsNamespace(resp http.ResponseWriter, req *http.Request) {
 func GetPodsName(resp http.ResponseWriter, req *http.Request) {
 	fmt.Println("Get Pods for Name from the cluster")
 
-	if clientServerList == nil {
+	if SwaggerToKubeInterfaceList == nil {
 		fmt.Println("Pod NAME GET API: There is no cluster registered")
 		resp.WriteHeader(http.StatusNoContent)
 		return
 	}
 	resp.Header().Set("Content-Type", "application/json")
+	
 	urlArgs := strings.TrimPrefix(req.URL.Path, k8sPodPath + "/")
 	urlArgsList := strings.Split(urlArgs, "/")
 	clusterName := urlArgsList[0]
 	namespace := urlArgsList[1]
 	name := urlArgsList[2]
 	fmt.Println("Pod: cluster Name, Namespace, Name input:", clusterName, namespace, name)
-	for _, v := range clientServerList {
+	for _, swgL := range SwaggerToKubeInterfaceList {
+		v := *swgL.SwaggerClientServer
 		if v.ClusterName == clusterName {
 			fmt.Println("Pod NAME GET API: Valid Cluster")
 			message, err := ctr.GetKubeEvents(v.ConfigFileName, v.KubeURL, v.KubeServAcctToken, "pods", namespace, name)
@@ -822,7 +826,7 @@ func GetPodsName(resp http.ResponseWriter, req *http.Request) {
 func GetSecretsAll(resp http.ResponseWriter, req *http.Request) {
 	fmt.Println("Get All Secrets from the cluster")
 
-	if clientServerList == nil {
+	if SwaggerToKubeInterfaceList == nil {
 		fmt.Println("Secret ALL GET API: There is no cluster registered")
 		resp.WriteHeader(http.StatusNoContent)
 		return
@@ -830,7 +834,8 @@ func GetSecretsAll(resp http.ResponseWriter, req *http.Request) {
 	resp.Header().Set("Content-Type", "application/json")
 	clusterName := strings.TrimPrefix(req.URL.Path, k8sSecretPath + "/")
 	fmt.Println("Secret: cluster Name input:", clusterName)
-	for _, v := range clientServerList {
+	for _, swgL := range SwaggerToKubeInterfaceList {
+		v := *swgL.SwaggerClientServer
 		if v.ClusterName == clusterName {
 			fmt.Println("Secret ALL GET API: Valid Cluster")
 			message, err := ctr.GetKubeEvents(v.ConfigFileName, v.KubeURL, v.KubeServAcctToken, "secrets")
@@ -850,7 +855,7 @@ func GetSecretsAll(resp http.ResponseWriter, req *http.Request) {
 func GetSecretsNamespace(resp http.ResponseWriter, req *http.Request) {
 	fmt.Println("Get Secrets for Namespace from the cluster")
 
-	if clientServerList == nil {
+	if SwaggerToKubeInterfaceList == nil {
 		fmt.Println("Secret NAMESPACE GET API: There is no cluster registered")
 		resp.WriteHeader(http.StatusNoContent)
 		return
@@ -861,7 +866,8 @@ func GetSecretsNamespace(resp http.ResponseWriter, req *http.Request) {
 	clusterName := urlArgsList[0]
 	namespace := urlArgsList[1]
 	fmt.Println("Secret: cluster Name, Namespace input:", clusterName, namespace)
-	for _, v := range clientServerList {
+	for _, swgL := range SwaggerToKubeInterfaceList {
+		v := *swgL.SwaggerClientServer
 		if v.ClusterName == clusterName {
 			fmt.Println("Secret NAMESPACE GET API: Valid Cluster")
 			message, err := ctr.GetKubeEvents(v.ConfigFileName, v.KubeURL, v.KubeServAcctToken, "secrets", namespace)
@@ -881,7 +887,7 @@ func GetSecretsNamespace(resp http.ResponseWriter, req *http.Request) {
 func GetSecretsName(resp http.ResponseWriter, req *http.Request) {
 	fmt.Println("Get Secrets for Name from the cluster")
 
-	if clientServerList == nil {
+	if SwaggerToKubeInterfaceList == nil {
 		fmt.Println("Secret NAME GET API: There is no cluster registered")
 		resp.WriteHeader(http.StatusNoContent)
 		return
@@ -893,7 +899,8 @@ func GetSecretsName(resp http.ResponseWriter, req *http.Request) {
 	namespace := urlArgsList[1]
 	name := urlArgsList[2]
 	fmt.Println("Secret: cluster Name, Namespace, Name input:", clusterName, namespace, name)
-	for _, v := range clientServerList {
+	for _, swgL := range SwaggerToKubeInterfaceList {
+		v := *swgL.SwaggerClientServer
 		if v.ClusterName == clusterName {
 			fmt.Println("Secret NAME GET API: Valid Cluster")
 			message, err := ctr.GetKubeEvents(v.ConfigFileName, v.KubeURL, v.KubeServAcctToken, "secrets", namespace, name)
@@ -913,7 +920,7 @@ func GetSecretsName(resp http.ResponseWriter, req *http.Request) {
 func GetServicesAll(resp http.ResponseWriter, req *http.Request) {
 	fmt.Println("Get All Services from the cluster")
 
-	if clientServerList == nil {
+	if SwaggerToKubeInterfaceList == nil {
 		fmt.Println("Service ALL GET API: There is no cluster registered")
 		resp.WriteHeader(http.StatusNoContent)
 		return
@@ -921,7 +928,8 @@ func GetServicesAll(resp http.ResponseWriter, req *http.Request) {
 	resp.Header().Set("Content-Type", "application/json")
 	clusterName := strings.TrimPrefix(req.URL.Path, k8sServicePath + "/")
 	fmt.Println("Service: cluster Name input:", clusterName)
-	for _, v := range clientServerList {
+	for _, swgL := range SwaggerToKubeInterfaceList {
+		v := *swgL.SwaggerClientServer
 		if v.ClusterName == clusterName {
 			fmt.Println("Service ALL GET API: Valid Cluster")
 			message, err := ctr.GetKubeEvents(v.ConfigFileName, v.KubeURL, v.KubeServAcctToken, "services")
@@ -941,7 +949,7 @@ func GetServicesAll(resp http.ResponseWriter, req *http.Request) {
 func GetServicesNamespace(resp http.ResponseWriter, req *http.Request) {
 	fmt.Println("Get Services for Namespace from the cluster")
 
-	if clientServerList == nil {
+	if SwaggerToKubeInterfaceList == nil {
 		fmt.Println("Service NAMESPACE GET API: There is no cluster registered")
 		resp.WriteHeader(http.StatusNoContent)
 		return
@@ -952,7 +960,8 @@ func GetServicesNamespace(resp http.ResponseWriter, req *http.Request) {
 	clusterName := urlArgsList[0]
 	namespace := urlArgsList[1]
 	fmt.Println("Service: cluster Name, Namespace input:", clusterName, namespace)
-	for _, v := range clientServerList {
+	for _, swgL := range SwaggerToKubeInterfaceList {
+		v := *swgL.SwaggerClientServer
 		if v.ClusterName == clusterName {
 			fmt.Println("Service NAMESPACE GET API: Valid Cluster")
 			message, err := ctr.GetKubeEvents(v.ConfigFileName, v.KubeURL, v.KubeServAcctToken, "services", namespace)
@@ -972,7 +981,7 @@ func GetServicesNamespace(resp http.ResponseWriter, req *http.Request) {
 func GetServicesName(resp http.ResponseWriter, req *http.Request) {
 	fmt.Println("Get Services for Name from the cluster")
 
-	if clientServerList == nil {
+	if SwaggerToKubeInterfaceList == nil {
 		fmt.Println("Service NAME GET API: There is no cluster registered")
 		resp.WriteHeader(http.StatusNoContent)
 		return
@@ -984,7 +993,8 @@ func GetServicesName(resp http.ResponseWriter, req *http.Request) {
 	namespace := urlArgsList[1]
 	name := urlArgsList[2]
 	fmt.Println("Service: cluster Name, Namespace, Name input:", k8sServicePath, urlArgs, urlArgsList, clusterName, namespace, name)
-	for _, v := range clientServerList {
+	for _, swgL := range SwaggerToKubeInterfaceList {
+		v := *swgL.SwaggerClientServer
 		if v.ClusterName == clusterName {
 			fmt.Println("Service NAME GET API: Valid Cluster")
 			message, err := ctr.GetKubeEvents(v.ConfigFileName, v.KubeURL, v.KubeServAcctToken, "services", namespace, name)
@@ -1004,7 +1014,7 @@ func GetServicesName(resp http.ResponseWriter, req *http.Request) {
 func GetIngressesAll(resp http.ResponseWriter, req *http.Request) {
 	fmt.Println("Get All Ingresses from the cluster")
 
-	if clientServerList == nil {
+	if SwaggerToKubeInterfaceList == nil {
 		fmt.Println("Ingress ALL GET API: There is no cluster registered")
 		resp.WriteHeader(http.StatusNoContent)
 		return
@@ -1012,7 +1022,8 @@ func GetIngressesAll(resp http.ResponseWriter, req *http.Request) {
 	resp.Header().Set("Content-Type", "application/json")
 	clusterName := strings.TrimPrefix(req.URL.Path, k8sIngressPath + "/")
 	fmt.Println("Ingress: cluster Name input:", clusterName)
-	for _, v := range clientServerList {
+	for _, swgL := range SwaggerToKubeInterfaceList {
+		v := *swgL.SwaggerClientServer
 		if v.ClusterName == clusterName {
 			fmt.Println("Ingress ALL GET API: Valid Cluster")
 			message, err := ctr.GetKubeEvents(v.ConfigFileName, v.KubeURL, v.KubeServAcctToken, "ingresses")
@@ -1032,7 +1043,7 @@ func GetIngressesAll(resp http.ResponseWriter, req *http.Request) {
 func GetIngressesNamespace(resp http.ResponseWriter, req *http.Request) {
 	fmt.Println("Get Ingresses for Namespace from the cluster")
 
-	if clientServerList == nil {
+	if SwaggerToKubeInterfaceList == nil {
 		fmt.Println("Ingress NAMESPACE GET API: There is no cluster registered")
 		resp.WriteHeader(http.StatusNoContent)
 		return
@@ -1043,7 +1054,8 @@ func GetIngressesNamespace(resp http.ResponseWriter, req *http.Request) {
 	clusterName := urlArgsList[0]
 	namespace := urlArgsList[1]
 	fmt.Println("Ingress: cluster Name, Namespace input:", clusterName, namespace)
-	for _, v := range clientServerList {
+	for _, swgL := range SwaggerToKubeInterfaceList {
+		v := *swgL.SwaggerClientServer
 		if v.ClusterName == clusterName {
 			fmt.Println("Ingress NAMESPACE GET API: Valid Cluster")
 			message, err := ctr.GetKubeEvents(v.ConfigFileName, v.KubeURL, v.KubeServAcctToken, "ingresses", namespace)
@@ -1063,7 +1075,7 @@ func GetIngressesNamespace(resp http.ResponseWriter, req *http.Request) {
 func GetIngressesName(resp http.ResponseWriter, req *http.Request) {
 	fmt.Println("Get Ingresses for Name from the cluster")
 
-	if clientServerList == nil {
+	if SwaggerToKubeInterfaceList == nil {
 		fmt.Println("Ingress NAME GET API: There is no cluster registered")
 		resp.WriteHeader(http.StatusNoContent)
 		return
@@ -1075,7 +1087,8 @@ func GetIngressesName(resp http.ResponseWriter, req *http.Request) {
 	namespace := urlArgsList[1]
 	name := urlArgsList[2]
 	fmt.Println("Ingress: cluster Name, Namespace, Name input:", clusterName, namespace, name)
-	for _, v := range clientServerList {
+	for _, swgL := range SwaggerToKubeInterfaceList {
+		v := *swgL.SwaggerClientServer
 		if v.ClusterName == clusterName {
 			fmt.Println("Ingress NAME GET API: Valid Cluster")
 			message, err := ctr.GetKubeEvents(v.ConfigFileName, v.KubeURL, v.KubeServAcctToken, "ingresses", namespace, name)
@@ -1096,34 +1109,45 @@ func GetIngressesName(resp http.ResponseWriter, req *http.Request) {
 func GetAllClientServer(resp http.ResponseWriter, req *http.Request){
 	fmt.Println("Get All Client Server")
 
-	if (clientServerList == nil) {
+	if (SwaggerToKubeInterfaceList == nil) {
 		fmt.Println("List is Empty")
 		resp.WriteHeader(http.StatusNoContent)
 		return 
 	} 
 	resp.WriteHeader(http.StatusOK)
     resp.Header().Set("Content-Type", "application/json")
+    var clientServerList []swaggerInterface.CreateClientServer
+    for _,v := range SwaggerToKubeInterfaceList {
+    	clientServerList = append(clientServerList, *v.SwaggerClientServer)
+    }
     json.NewEncoder(resp).Encode(clientServerList)
 	return
 
 }
 
 func UpdateClientServer(resp http.ResponseWriter, req *http.Request){
-	fmt.Println("UPDATE  Client Server")
-	if (clientServerList == nil) {
+	
+	statusString := "UPDATE Client Server: NOT SUPPORTED: Use DELETE AND ADD instead"
+	fmt.Println(statusString)
+	resp.WriteHeader(http.StatusMethodNotAllowed)
+	resp.Write([]byte(statusString))
+	return
+	
+	if (SwaggerToKubeInterfaceList == nil) {
 		fmt.Println("Update Operation is only for configured entities")
 		resp.WriteHeader(http.StatusNotFound)
 		return 
 	} 
-	newdata := createClientServer{}
+	newdata := swaggerInterface.CreateClientServer{}
 	err := json.NewDecoder(req.Body).Decode(&newdata)
 	if err != nil {
                 fmt.Println("READING ERROR", err)
         }
-	for id := range clientServerList {
-       		if (clientServerList[id].ClusterName == newdata.ClusterName){
+	for _, swgL := range SwaggerToKubeInterfaceList {
+			v := *swgL.SwaggerClientServer
+       		if (v.ClusterName == newdata.ClusterName){
 			fmt.Println("Entity is Exist, Updating the entity")
-			clientServerList[id] = newdata
+			v = newdata
 			resp.WriteHeader(http.StatusOK)
 			return 
 		} 
@@ -1134,43 +1158,55 @@ func UpdateClientServer(resp http.ResponseWriter, req *http.Request){
 }
 
 func DeleteClientServer(resp http.ResponseWriter, req *http.Request){
-	fmt.Println("Delete Client Server\n", len(clientServerList))
-	if (clientServerList == nil) {
-		fmt.Println("Entity is not configured")
+	fmt.Println("\nDelete Client Server: Server Count: ", len(SwaggerToKubeInterfaceList))
+	
+	if (SwaggerToKubeInterfaceList == nil) {
+		statusString := "NOT PRESENT: Cluster :ZERO ENTITIES IN LIST"
+		fmt.Println(statusString)
 		resp.WriteHeader(http.StatusNotFound)
+		resp.Write([]byte(statusString))
 		return 
-	} 
-	newdata := createClientServer{}
+	}
+	 
+	newdata := swaggerInterface.CreateClientServer{}
 	err := json.NewDecoder(req.Body).Decode(&newdata)
 	if err != nil {
                 fmt.Println("READING ERROR", err)
         }
-	for id := range clientServerList {
-       		if (clientServerList[id].ClusterName == newdata.ClusterName){
-			fmt.Println("Entity is Exist, Removing the etity", newdata.ClusterName)
-			clientServerList = append(clientServerList[:id], clientServerList[id+1:]...)
+	for id, swgL := range SwaggerToKubeInterfaceList {
+		v := *swgL.SwaggerClientServer
+       	if (v.ClusterName == newdata.ClusterName){
+       		
+			swgL.DeleteAll()
+			SwaggerToKubeInterfaceList = append(SwaggerToKubeInterfaceList[:id], SwaggerToKubeInterfaceList[id+1:]...)
+			
+			statusString := "DELETED: entity: " + newdata.ClusterName
+			fmt.Println(statusString)
 			resp.WriteHeader(http.StatusOK)
-			return 
-		} 
-    	}
-	fmt.Printf("Dump Complete List")
-	spew.Dump(clientServerList)
-	fmt.Println("Entity is not configured")
+			resp.Write([]byte(statusString))
+			
+			return
+		}
+    }
+	statusString := "NOT PRESENT: " + newdata.ClusterName
+	fmt.Println(statusString)
 	resp.WriteHeader(http.StatusNotFound)
+	resp.Write([]byte(statusString))
 	return 
 }
 
 
 func PostClientServer(resp http.ResponseWriter, req *http.Request){
 	fmt.Println("Post Client Server")
-	newdata := createClientServer{}
+	newdata := swaggerInterface.CreateClientServer{}
 	err := json.NewDecoder(req.Body).Decode(&newdata)
 	if err != nil {
                 fmt.Println("READING ERROR", err)
         }
     	fmt.Printf("DECODER Results: %v\n", newdata)
-	for id := range clientServerList {
-       		if (clientServerList[id].ClusterName == newdata.ClusterName){
+	for _, swgL := range SwaggerToKubeInterfaceList {
+			v := *swgL.SwaggerClientServer
+       		if (v.ClusterName == newdata.ClusterName){
 			response := "Entity is Exist, please use update API for updating Endpoint/Server details"
 			fmt.Println(response)
         		http.Error(resp, response, http.StatusNotModified)
@@ -1178,13 +1214,14 @@ func PostClientServer(resp http.ResponseWriter, req *http.Request){
 		} 
     	}
 	
-	fmt.Printf("Dump Complete Struture=%v", clientServerList)
-	spew.Dump(clientServerList)
-	status, statusString := ctr.StartController(newdata.ConfigFileName, newdata.KubeURL, newdata.KubeServAcctToken,
-		newdata.Namespaces, newdata.ServerURL, newdata.WatchEvents)
+	swg2KubeIntf := swaggerToKubeInterface.SwaggerToKubeInterface{SwaggerClientServer: &newdata}
+	
+	
+	status, statusString := ctr.StartController(&swg2KubeIntf)
 	if status == http.StatusOK {
-		clientServerList = append(clientServerList, newdata)
+		SwaggerToKubeInterfaceList = append(SwaggerToKubeInterfaceList, swg2KubeIntf)
 	}
+	
 	resp.WriteHeader(status)
 	resp.Write([]byte(statusString))
 	return
