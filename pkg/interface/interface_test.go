@@ -8,6 +8,7 @@ import(
 	"fmt"
 	"os"
         "path/filepath"
+        "multicluster-ingress-controller/pkg/swaggerInterface"
 )
 func TestInitRestInterface(t *testing.T) {
 	Convey("Initializing Citrix Control Plane", t, func(){
@@ -16,7 +17,7 @@ func TestInitRestInterface(t *testing.T) {
 }
 func TestRestInterface(t *testing.T) {
 	StartRestServer()
-	data := createClientServer{}
+	data := swaggerInterface.CreateClientServer{}
 	data.ClusterName = "Cluster-1" 
 	data.ConfigFileName = "/home/.kube/config"
 	data.ServerURL = append(data.ServerURL, "22.22.22.22")

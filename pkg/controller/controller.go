@@ -3,31 +3,28 @@ package controller
 import (
 	"github.com/google/uuid"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
-	"bytes"
-        "encoding/json"
         "fmt"
         "k8s.io/api/core/v1"
         metav1 "k8s.io/apimachinery/pkg/apis/meta/v1" 
-        "k8s.io/apimachinery/pkg/fields"
-        "k8s.io/client-go/kubernetes"
         restclient "k8s.io/client-go/rest"
-        "k8s.io/client-go/tools/cache"
-        "k8s.io/client-go/tools/clientcmd"
 	//testapi "k8s.io/client-go/tools/cache/testing"
-        "k8s.io/klog"
         "os"
         "path/filepath"
 	"net/http"
 	"strings"
 	"errors"
+	"multicluster-ingress-controller/pkg/events"
+	"multicluster-ingress-controller/pkg/swaggerToKubeInterface"
+	"multicluster-ingress-controller/pkg/kubernetesAPIServer"
+	"multicluster-ingress-controller/pkg/swaggerInterface"
 )
 
 const (
-	endpoints string = "endpoints"
-	services string = "services"
-	pods string = "pods"
-	secrets string = "secrets"
-	ingresses string = "ingresses"
+	endpoints string = events.Endpoints
+	services string = events.Services
+	pods string = events.Pods
+	secrets string = events.Secrets
+	ingresses string = events.Ingresses
 )
 
 var (
@@ -38,276 +35,16 @@ var (
 	endpointAPI = "http://10.221.42.109:30132/sdc/nitro/v1/config/app_event"
 	//endpointAPI = "http://localhost:8080/api/v1/pods"
 )
-func NewController() *Controller {
-	return new(Controller)
-}
-type Controller struct {
-        Api  *KubernetesAPIServer 
-        ServerList []string
-	EventList []string
-}
-//This is interface for Kubernetes API Server
-type KubernetesAPIServer struct {
-        Suffix string
-        Client kubernetes.Interface
-}
+
+
 
 func GenerateUUID() string {
 	uuid := uuid.New()
 	s := uuid.String()
 	return s
 }
-// This function provides the kube client config file with the provided inputs
-func getConfig(configFile, kubeURL, kubeServAcctToken string) (*restclient.Config, error) {
-	if (configFile != "") {
-		config, err = clientcmd.BuildConfigFromFlags("", configFile)
-		if err != nil {
-			klog.Error("[ERROR] Did not find valid kube config info")
-			return nil, err
-		}
-		return config, err
-	}else {
-		if configFile == "" && kubeURL == "" && kubeServAcctToken == "" {
-			config, err = clientcmd.BuildConfigFromFlags("", "")
-			if err != nil {
-				klog.Error("[WARNING] Citrix Node Controller Failed to create a Client")
-				return nil, err
-			}
-			return config, err
-		} else {
-			/* A valid KubeURL and Token scenario as the validation for the integrity
-			   of input Kube parameters are done at validateKubeClusterFields()
-			 */
-			return &restclient.Config{
-				Host: kubeURL,
-				BearerToken: kubeServAcctToken,
-				TLSClientConfig: restclient.TLSClientConfig{Insecure: true},
-			}, nil
-		}
-	}
-}
 
-/* This API creates Kubernetes client session. API requires config file or Kubernetes URL and Kubernetes Service Account Token.
- * If file is not in default location, provide with path of the file.
- */
-func CreateK8sApiserverClient(configFile , kubeURL, kubeServAcctToken string) (*KubernetesAPIServer, error) {
-        klog.Info("[INFO] Creating API Client", configFile)
-        api := &KubernetesAPIServer{}
-		config, err := getConfig(configFile, kubeURL, kubeServAcctToken)
-		if err != nil {
-			klog.Error("[ERROR] Failed to obtain Kubernetes Config")
-			return nil, err
-		}
-
-        client, err := kubernetes.NewForConfig(config)
-        if err != nil {
-                klog.Error("[ERROR] Failed to establish connection")
-                klog.Fatal(err)
-        }
-        klog.Info("[INFO] Kubernetes Client is created")
-        api.Client = client
-        return api, nil
-}
-
-func ingressEventParseAndSendData(obj interface{}, eventType string, contr Controller) {
-	objByte, err := json.Marshal(obj)
-        if err != nil {
-        	klog.Errorf("[ERROR] Failed to Marshal original object: %v", err)
-        }
-        var objJson v1beta1.Ingress
-	if err = json.Unmarshal(objByte, &objJson); err != nil {
-                klog.Errorf("[ERROR] Failed to unmarshal original object: %v", err)
-        }
-	if (objJson.ObjectMeta.Namespace == "kube-system"){
-		return
-	}
-	message, err := json.MarshalIndent(objJson, "", "  ")
-	parseAndSendData(string (message), objJson.ObjectMeta,  obj.(*v1beta1.Ingress).TypeMeta, "Ingress", eventType, contr)
-
-}
-func secretEventParseAndSendData(obj interface{}, eventType string, contr Controller) {
-	objByte, err := json.Marshal(obj)
-        if err != nil {
-        	klog.Errorf("[ERROR] Failed to Marshal original object: %v", err)
-        }
-        var objJson v1.Secret
-	if err = json.Unmarshal(objByte, &objJson); err != nil {
-                klog.Errorf("[ERROR] Failed to unmarshal original object: %v", err)
-        }
-	if (objJson.ObjectMeta.Namespace == "kube-system"){
-		return
-	}
-	message, err := json.MarshalIndent(objJson, "", "  ")
-	parseAndSendData(string (message), objJson.ObjectMeta,  obj.(*v1.Secret).TypeMeta, "Secret", eventType, contr)
-
-}
-func IngressWatcher(api *KubernetesAPIServer, contr Controller, Namespace []string) {
-	if len(Namespace) == 0 {
-		IngressWatchAllNamespace(api, contr)
-	}else {
-                IngressWatchPerNamespace(api, contr, Namespace)	
-	}
-        return
-}
-
-func IngressWatchAllNamespace(api *KubernetesAPIServer, contr Controller) {
-        klog.Info("[INFO] Watch Ingress for all the namespaces")
-        ingressListWatcher := cache.NewListWatchFromClient(api.Client.ExtensionsV1beta1().RESTClient(), "ingresses", v1.NamespaceAll, fields.Everything())
-        _, controller := cache.NewInformer(ingressListWatcher, &v1beta1.Ingress{}, 0, cache.ResourceEventHandlerFuncs{
-                AddFunc: func(obj interface{}) {
-			ingressEventParseAndSendData(obj, "ADDED", contr)
-                },
-                UpdateFunc: func(obj interface{}, newobj interface{}) {
-			ingressEventParseAndSendData(newobj, "MODIFIED", contr)
-                },
-                DeleteFunc: func(obj interface{}) {
-			ingressEventParseAndSendData(obj, "DELETED", contr)
-                },
-        },
-        )
-        stop := make(chan struct{})
-        go controller.Run(stop)
-        return
-}
-
-func IngressWatchPerNamespace(api *KubernetesAPIServer, contr Controller, Namespace []string) {
-        klog.Info("[INFO] Watch Ingress for following namespaces", Namespace)
-        for _, namespace := range Namespace {
-        	ingressListWatcher := cache.NewListWatchFromClient(api.Client.ExtensionsV1beta1().RESTClient(), "ingresses", namespace, fields.Everything())
-        	_, controller := cache.NewInformer(ingressListWatcher, &v1beta1.Ingress{}, 0, cache.ResourceEventHandlerFuncs{
-                	AddFunc: func(obj interface{}) {
-				ingressEventParseAndSendData(obj, "ADDED", contr)
-                	},
-                	UpdateFunc: func(obj interface{}, newobj interface{}) {
-				ingressEventParseAndSendData(newobj, "MODIFIED", contr)
-                	},
-                	DeleteFunc: func(obj interface{}) {
-				ingressEventParseAndSendData(obj, "DELETED", contr)
-                	},
-        	},
-        	)
-		stop := make(chan struct{})
-        	go controller.Run(stop)
-	}
-        return
-}
-
-func SecretWatcher(api *KubernetesAPIServer, contr Controller, Namespace []string) {
-	if len(Namespace) == 0 {
-		SecretWatchAllNamespace(api, contr)
-	}else {
-                SecretWatchPerNamespace(api, contr, Namespace)	
-	}
-        return
-}
-
-func SecretWatchAllNamespace(api *KubernetesAPIServer, contr Controller) {
-        secretListWatcher := cache.NewListWatchFromClient(api.Client.Core().RESTClient(), "secrets", v1.NamespaceAll, fields.Everything())
-        _, controller := cache.NewInformer(secretListWatcher, &v1.Secret{}, 0, cache.ResourceEventHandlerFuncs{
-                AddFunc: func(obj interface{}) {
-			secretEventParseAndSendData(obj, "ADDED", contr)
-                },
-                UpdateFunc: func(obj interface{}, newobj interface{}) {
-			secretEventParseAndSendData(newobj, "MODIFIED", contr)
-                },
-                DeleteFunc: func(obj interface{}) {
-			secretEventParseAndSendData(obj, "DELETED", contr)
-                },
-        },
-        )
-        stop := make(chan struct{})
-        go controller.Run(stop)
-        return
-}
-
-func SecretWatchPerNamespace(api *KubernetesAPIServer, contr Controller, Namespace []string) {
-        klog.Info("[INFO] Watch Secret events for following namespaces", Namespace)
-        for _, namespace := range Namespace {
-        	secretListWatcher := cache.NewListWatchFromClient(api.Client.Core().RESTClient(), "secrets", namespace, fields.Everything())
-        	_, controller := cache.NewInformer(secretListWatcher, &v1.Secret{}, 0, cache.ResourceEventHandlerFuncs{
-                	AddFunc: func(obj interface{}) {
-				secretEventParseAndSendData(obj, "ADDED", contr)
-                	},
-                	UpdateFunc: func(obj interface{}, newobj interface{}) {
-				secretEventParseAndSendData(newobj, "MODIFIED", contr)
-                	},
-                	DeleteFunc: func(obj interface{}) {
-				secretEventParseAndSendData(obj, "DELETED", contr)
-                	},
-        	},
-        	)
-        	stop := make(chan struct{})
-        	go controller.Run(stop)
-	}
-        return
-}
-
-func endpointEventParseAndSendData(obj interface{}, eventType string, contr Controller) {
-	objByte, err := json.Marshal(obj)
-        if err != nil {
-        	klog.Errorf("[ERROR] Failed to Marshal original object: %v", err)
-        }
-        var objJson v1.Endpoints
-	if err = json.Unmarshal(objByte, &objJson); err != nil {
-        	klog.Errorf("[ERROR] Failed to unmarshal original object: %v", err)
-        }
-	message, err := json.MarshalIndent(objJson, "", "  ")
-	if (objJson.ObjectMeta.Namespace == "kube-system"){
-		return
-	}
-	parseAndSendData(string (message), objJson.ObjectMeta, objJson.TypeMeta, "Endpoints", eventType, contr)
-}
-func EndpointWatcher(api *KubernetesAPIServer, contr Controller, Namespace []string) {
-	if len(Namespace) == 0 {
-		EndpointWatchAllNamespace(api, contr)
-	}else {
-                EndpointWatchPerNamespace(api, contr, Namespace)	
-	}
-        return
-}
-
-func EndpointWatchAllNamespace(api *KubernetesAPIServer, contr Controller) {
-        endpointListWatcher := cache.NewListWatchFromClient(api.Client.Core().RESTClient(), "endpoints", v1.NamespaceAll, fields.Everything())
-        _, controller := cache.NewInformer(endpointListWatcher, &v1.Endpoints{}, 0, cache.ResourceEventHandlerFuncs{
-                AddFunc: func(obj interface{}) {
-			endpointEventParseAndSendData(obj, "ADDED", contr) 
-                },
-                UpdateFunc: func(obj interface{}, newobj interface{}) {
-			endpointEventParseAndSendData(newobj, "MODIFIED", contr)
-                },
-                DeleteFunc: func(obj interface{}) {
-			endpointEventParseAndSendData(obj, "DELETED", contr)
-                },
-        },
-        )
-        stop := make(chan struct{})
-        go controller.Run(stop)
-        return
-}
-
-func EndpointWatchPerNamespace(api *KubernetesAPIServer, contr Controller, Namespace []string) {
-        klog.Info("[INFO] Watch Endpoint for following namespaces", Namespace)
-        for _, namespace := range Namespace {
-            endpointListWatcher := cache.NewListWatchFromClient(api.Client.Core().RESTClient(), "endpoints", namespace, fields.Everything())
-            _, controller := cache.NewInformer(endpointListWatcher, &v1.Endpoints{}, 0, cache.ResourceEventHandlerFuncs{
-                    AddFunc: func(obj interface{}) {
-			endpointEventParseAndSendData(obj, "ADDED", contr) 
-                    },
-                    UpdateFunc: func(obj interface{}, newobj interface{}) {
-			endpointEventParseAndSendData(newobj, "MODIFIED", contr)
-                    },
-                    DeleteFunc: func(obj interface{}) {
-			endpointEventParseAndSendData(obj, "DELETED", contr)
-                    },
-           },
-           )
-           stop := make(chan struct{})
-           go controller.Run(stop)
-	}
-        return
-}
-
-func GetKubeEndpointsAll(api *KubernetesAPIServer) *v1.EndpointsList {
+func GetKubeEndpointsAll(api *kubernetesAPIServer.KubernetesAPIServer) *v1.EndpointsList {
 	fmt.Println("Endpoints GET ALL API: Calling kubernetes API server")
 	obj, err := api.Client.Core().Endpoints(metav1.NamespaceAll).List(metav1.ListOptions{})
 	if err != nil {
@@ -317,7 +54,7 @@ func GetKubeEndpointsAll(api *KubernetesAPIServer) *v1.EndpointsList {
 }
 
 
-func GetKubeEndpointsNamespace(api *KubernetesAPIServer, namespace string) *v1.EndpointsList {
+func GetKubeEndpointsNamespace(api *kubernetesAPIServer.KubernetesAPIServer, namespace string) *v1.EndpointsList {
 	fmt.Println("Endpoints GET ALL API: Calling kubernetes API server")
 	obj, err := api.Client.Core().Endpoints(namespace).List(metav1.ListOptions{})
 	if err != nil {
@@ -327,7 +64,7 @@ func GetKubeEndpointsNamespace(api *KubernetesAPIServer, namespace string) *v1.E
 }
 
 
-func GetKubeEndpointsName(api *KubernetesAPIServer, namespace string, name string) *v1.Endpoints {
+func GetKubeEndpointsName(api *kubernetesAPIServer.KubernetesAPIServer, namespace string, name string) *v1.Endpoints {
     fmt.Println("Endpoints GET API: Calling kubernetes API server")
 	obj, err := api.Client.Core().Endpoints(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
@@ -335,7 +72,7 @@ func GetKubeEndpointsName(api *KubernetesAPIServer, namespace string, name strin
 	}
 	return obj
 }
-func EndpointGet(api *KubernetesAPIServer, namespace string) *v1.EndpointsList {
+func EndpointGet(api *kubernetesAPIServer.KubernetesAPIServer, namespace string) *v1.EndpointsList {
         fmt.Println("ENDPOINT GET API: Calling kubernetes API server")
 	endpointslist, err := api.Client.Core().Endpoints(namespace).List(metav1.ListOptions{})
 	if err != nil {
@@ -357,7 +94,7 @@ func EndpointGet(api *KubernetesAPIServer, namespace string) *v1.EndpointsList {
 	return endpointslist
 }
 
-func NamespaceGet(api *KubernetesAPIServer, namespace string, name string) *v1.Namespace {
+func NamespaceGet(api *kubernetesAPIServer.KubernetesAPIServer, namespace string, name string) *v1.Namespace {
         fmt.Println("NAMESPACE Name GET API: Calling kubernetes API server")
 	obj, err := api.Client.Core().Namespaces().Get(name, metav1.GetOptions{})
 	if err != nil {
@@ -366,7 +103,7 @@ func NamespaceGet(api *KubernetesAPIServer, namespace string, name string) *v1.N
 	return obj
 }
 
-func GetKubePodsAll(api *KubernetesAPIServer) *v1.PodList {
+func GetKubePodsAll(api *kubernetesAPIServer.KubernetesAPIServer) *v1.PodList {
 	fmt.Println("POD GET ALL API: Calling kubernetes API server")
 	obj, err := api.Client.Core().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
 	if err != nil {
@@ -376,7 +113,7 @@ func GetKubePodsAll(api *KubernetesAPIServer) *v1.PodList {
 }
 
 
-func GetKubePodsNamespace(api *KubernetesAPIServer, namespace string) *v1.PodList {
+func GetKubePodsNamespace(api *kubernetesAPIServer.KubernetesAPIServer, namespace string) *v1.PodList {
 	fmt.Println("POD GET NAMESPACE API: Calling kubernetes API server")
 	obj, err := api.Client.Core().Pods(namespace).List(metav1.ListOptions{})
 	if err != nil {
@@ -386,7 +123,7 @@ func GetKubePodsNamespace(api *KubernetesAPIServer, namespace string) *v1.PodLis
 }
 
 
-func GetKubePodsName(api *KubernetesAPIServer, namespace string, name string) *v1.Pod {
+func GetKubePodsName(api *kubernetesAPIServer.KubernetesAPIServer, namespace string, name string) *v1.Pod {
     fmt.Println("POD GET Name API: Calling kubernetes API server")
 	obj, err := api.Client.Core().Pods(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
@@ -395,7 +132,7 @@ func GetKubePodsName(api *KubernetesAPIServer, namespace string, name string) *v
 	return obj
 }
 
-func GetKubeSecretsAll(api *KubernetesAPIServer) *v1.SecretList {
+func GetKubeSecretsAll(api *kubernetesAPIServer.KubernetesAPIServer) *v1.SecretList {
 	fmt.Println("SECRET GET ALL API: Calling kubernetes API server")
 	obj, err := api.Client.Core().Secrets(metav1.NamespaceAll).List(metav1.ListOptions{})
 	if err != nil {
@@ -405,7 +142,7 @@ func GetKubeSecretsAll(api *KubernetesAPIServer) *v1.SecretList {
 }
 
 
-func GetKubeSecretsNamespace(api *KubernetesAPIServer, namespace string) *v1.SecretList {
+func GetKubeSecretsNamespace(api *kubernetesAPIServer.KubernetesAPIServer, namespace string) *v1.SecretList {
 	fmt.Println("SECRET Namespace GET API: Calling kubernetes API server")
 	obj, err := api.Client.Core().Secrets(namespace).List(metav1.ListOptions{})
 	if err != nil {
@@ -415,7 +152,7 @@ func GetKubeSecretsNamespace(api *KubernetesAPIServer, namespace string) *v1.Sec
 }
 
 
-func GetKubeSecretsName(api *KubernetesAPIServer, namespace string, name string) *v1.Secret {
+func GetKubeSecretsName(api *kubernetesAPIServer.KubernetesAPIServer, namespace string, name string) *v1.Secret {
     fmt.Println("SECRET Name GET API: Calling kubernetes API server")
 	obj, err := api.Client.Core().Secrets(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
@@ -424,7 +161,7 @@ func GetKubeSecretsName(api *KubernetesAPIServer, namespace string, name string)
 	return obj
 }
 
-func GetKubeIngressesAll(api *KubernetesAPIServer) *v1beta1.IngressList {
+func GetKubeIngressesAll(api *kubernetesAPIServer.KubernetesAPIServer) *v1beta1.IngressList {
 	fmt.Println("INGRESS GET ALL API: Calling kubernetes API server")
 	obj, err := api.Client.ExtensionsV1beta1().Ingresses(metav1.NamespaceAll).List(metav1.ListOptions{})
 	if err != nil {
@@ -434,7 +171,7 @@ func GetKubeIngressesAll(api *KubernetesAPIServer) *v1beta1.IngressList {
 }
 
 
-func GetKubeIngressesNamespace(api *KubernetesAPIServer, namespace string) *v1beta1.IngressList {
+func GetKubeIngressesNamespace(api *kubernetesAPIServer.KubernetesAPIServer, namespace string) *v1beta1.IngressList {
 	fmt.Println("INGRESS Namespace GET API: Calling kubernetes API server")
 	obj, err := api.Client.ExtensionsV1beta1().Ingresses(namespace).List(metav1.ListOptions{})
 	if err != nil {
@@ -444,7 +181,7 @@ func GetKubeIngressesNamespace(api *KubernetesAPIServer, namespace string) *v1be
 }
 
 
-func GetKubeIngressesName(api *KubernetesAPIServer, namespace string, name string) *v1beta1.Ingress {
+func GetKubeIngressesName(api *kubernetesAPIServer.KubernetesAPIServer, namespace string, name string) *v1beta1.Ingress {
     fmt.Println("INGRESS Name GET API: Calling kubernetes API server")
 	obj, err := api.Client.ExtensionsV1beta1().Ingresses(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
@@ -452,7 +189,7 @@ func GetKubeIngressesName(api *KubernetesAPIServer, namespace string, name strin
 	}
 	return obj
 }
-func GetKubeServicesAll(api *KubernetesAPIServer) *v1.ServiceList {
+func GetKubeServicesAll(api *kubernetesAPIServer.KubernetesAPIServer) *v1.ServiceList {
 	fmt.Println("SERVICE GET ALL API: Calling kubernetes API server")
 	obj, err := api.Client.Core().Services(metav1.NamespaceAll).List(metav1.ListOptions{})
 	if err != nil {
@@ -460,7 +197,7 @@ func GetKubeServicesAll(api *KubernetesAPIServer) *v1.ServiceList {
 	}
 	return obj
 }
-func GetKubeServicesNamespace(api *KubernetesAPIServer, namespace string) *v1.ServiceList {
+func GetKubeServicesNamespace(api *kubernetesAPIServer.KubernetesAPIServer, namespace string) *v1.ServiceList {
 	fmt.Println("SERVICE Namespace GET ALL API: Calling kubernetes API server")
 	obj, err := api.Client.Core().Services(namespace).List(metav1.ListOptions{})
 	if err != nil {
@@ -469,11 +206,11 @@ func GetKubeServicesNamespace(api *KubernetesAPIServer, namespace string) *v1.Se
 	return obj
 }
 
-func GetKubeServicesName(api *KubernetesAPIServer, namespace string, name string) *v1.Service {
+func GetKubeServicesName(api *kubernetesAPIServer.KubernetesAPIServer, namespace string, name string) *v1.Service {
 	return ServiceGet(api, namespace, name)
 }
 
-func ServiceGet(api *KubernetesAPIServer, namespace string, name string) *v1.Service {
+func ServiceGet(api *kubernetesAPIServer.KubernetesAPIServer, namespace string, name string) *v1.Service {
     fmt.Println("SERVICE Name GET API: Calling kubernetes API server")
 	obj, err := api.Client.Core().Services(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
@@ -481,235 +218,19 @@ func ServiceGet(api *KubernetesAPIServer, namespace string, name string) *v1.Ser
 	}
 	return obj
 }
-func serviceEventParseAndSendData(obj interface{}, eventType string, contr Controller) {
-	objByte, err := json.Marshal(obj)
-        if err != nil {
-        	klog.Errorf("[ERROR] Failed to Marshal original object: %v", err)
-        }
-        var objJson v1.Service
-	if err = json.Unmarshal(objByte, &objJson); err != nil {
-        	klog.Errorf("[ERROR] Failed to unmarshal original object: %v", err)
-        }
-	if (objJson.ObjectMeta.Namespace == "kube-system"){
-		return
-	}
-	message, err := json.MarshalIndent(objJson, "", "  ")
-	parseAndSendData(string (message), objJson.ObjectMeta, objJson.TypeMeta, "Service", eventType, contr)
-}
 
-func ServiceWatcher(api *KubernetesAPIServer, contr Controller, Namespace []string) {
-	if len(Namespace) == 0 {
-		ServiceWatchAllNamespace(api, contr)
-	}else {
-                ServiceWatchPerNamespace(api, contr, Namespace)	
-	}
-        return
-}
-
-func ServiceWatchAllNamespace(api *KubernetesAPIServer, contr Controller) {
-        serviceListWatcher := cache.NewListWatchFromClient(api.Client.Core().RESTClient(), string(v1.ResourceServices), v1.NamespaceAll, fields.Everything())
-        _, controller := cache.NewInformer(serviceListWatcher, &v1.Service{}, 0, cache.ResourceEventHandlerFuncs{
-                AddFunc: func(obj interface{}) {
-			serviceEventParseAndSendData(obj, "ADDED", contr)
-                },
-                UpdateFunc: func(obj interface{}, newobj interface{}) {
-			serviceEventParseAndSendData(newobj, "MODIFIED", contr)
-                },
-                DeleteFunc: func(obj interface{}) {
-			serviceEventParseAndSendData(obj, "DELETED", contr)
-                },
-        },
-        )
-        stop := make(chan struct{})
-        go controller.Run(stop)
-        return
-}
-
-func ServiceWatchPerNamespace(api *KubernetesAPIServer, contr Controller, Namespace []string) {
-        klog.Info("[INFO] Watch Service events for following namespaces", Namespace)
-        for _, namespace := range Namespace {
-        	serviceListWatcher := cache.NewListWatchFromClient(api.Client.Core().RESTClient(), string(v1.ResourceServices), namespace, fields.Everything())
-        	_, controller := cache.NewInformer(serviceListWatcher, &v1.Service{}, 0, cache.ResourceEventHandlerFuncs{
-                	AddFunc: func(obj interface{}) {
-				serviceEventParseAndSendData(obj, "ADDED", contr)
-                	},
-                	UpdateFunc: func(obj interface{}, newobj interface{}) {
-				serviceEventParseAndSendData(newobj, "MODIFIED", contr)
-                	},
-                	DeleteFunc: func(obj interface{}) {
-				serviceEventParseAndSendData(obj, "DELETED", contr)
-                	},
-        	},
-        	)
-        	stop := make(chan struct{})
-        	go controller.Run(stop)
-	}
-        return
-}
-
-func podEventParseAndSendData(obj interface{}, eventType string, contr Controller){
-	objByte, err := json.Marshal(obj)
-        if err != nil {
-        	klog.Errorf("[ERROR] Failed to Marshal original object: %v", err)
-        }
-        var objJson v1.Pod
-	if err = json.Unmarshal(objByte, &objJson); err != nil {
-                klog.Errorf("[ERROR] Failed to unmarshal original object: %v", err)
-        }
-	if (objJson.ObjectMeta.Namespace == "kube-system"){
-		return
-	}
-	message, err := json.MarshalIndent(objJson, "", "  ")
-	parseAndSendData(string (message), objJson.ObjectMeta, objJson.TypeMeta, "Pod", eventType, contr)
-}
-
-func PodWatcher(api *KubernetesAPIServer, contr Controller, Namespace []string) {
-	if len(Namespace) == 0 {
-		PodWatchAllNamespace(api, contr)
-	}else {
-                PodWatchPerNamespace(api, contr, Namespace)	
-	}
-        return
-}
-
-func PodWatchAllNamespace(api *KubernetesAPIServer, contr Controller) {
-        PodListWatcher := cache.NewListWatchFromClient(api.Client.Core().RESTClient(), string(v1.ResourcePods), v1.NamespaceAll, fields.Everything())
-        _, controller := cache.NewInformer(PodListWatcher, &v1.Pod{}, 0, cache.ResourceEventHandlerFuncs{
-                AddFunc: func(obj interface{}) {
-			podEventParseAndSendData(obj, "ADDED", contr)
-                },
-                UpdateFunc: func(obj interface{}, newobj interface{}) {
-			podEventParseAndSendData(newobj, "MODIFIED", contr)
-                },
-                DeleteFunc: func(obj interface{}) {
-			podEventParseAndSendData(obj, "DELETED", contr)
-                },
-        },
-        )
-        stop := make(chan struct{})
-        go controller.Run(stop)
-        return
-}
-
-
-func PodWatchPerNamespace(api *KubernetesAPIServer, contr Controller, Namespace []string) {
-        klog.Info("[INFO] Watch Pods for following namespaces", Namespace)
-        for _, namespace := range Namespace {
-        	PodListWatcher := cache.NewListWatchFromClient(api.Client.Core().RESTClient(), string(v1.ResourcePods), namespace, fields.Everything())
-        	_, controller := cache.NewInformer(PodListWatcher, &v1.Pod{}, 0, cache.ResourceEventHandlerFuncs{
-                	AddFunc: func(obj interface{}) {
-				podEventParseAndSendData(obj, "ADDED", contr)
-                	},
-                	UpdateFunc: func(obj interface{}, newobj interface{}) {
-				podEventParseAndSendData(newobj, "MODIFIED", contr)
-                	},
-                	DeleteFunc: func(obj interface{}) {
-				podEventParseAndSendData(obj, "DELETED", contr)
-                	},
-        	},
-        	)
-        	stop := make(chan struct{})
-        	go controller.Run(stop)
-	}
-        return
-}
-
-func parseAndSendData(obj string, metaData  metav1.ObjectMeta, metaHeader metav1.TypeMeta, kind string, objtype string, contr Controller) {
-	resp := make(map[string]string)
-	resp["app_event_id"] = GenerateUUID() 
-	resp["resource_type"] = kind 
-	resp["resource_name"] = metaData.Name
-	resp["resource_generations"] = string(metaData.Generation)
-	resp["resource_id"] = string(metaData.UID)
-	resp["app_environment_id"] = "joan-test"
-	resp["app_environment_type"] = "Kubernetes"
-	resp["type"] = objtype
-	resp["trig_time"] = ""
-	resp["server_group_id"] = metaData.Namespace
-	resp["resource_version"] = metaData.ResourceVersion
-	resp["message"] = obj
-	respJson, err := json.Marshal(resp)
-        if err != nil {
-        	klog.Errorf("[ERROR] Failed to Marshal original object: %v", err)
-        	fmt.Printf("[ERROR] Failed to Marshal original object: %v", err)
-	}
-	sendData(bytes.NewBuffer(respJson), contr)
-}
-
-
-func sendData(data *bytes.Buffer, contr Controller){
-	//servers.mux.Lock()
-        fmt.Print("[INFO] Sending the data")
-	for _,v := range contr.ServerList {	
-		tmp_data := *data
-		result, err := http.Post(v, "application/json", &tmp_data)
-		if (err != nil){
-			fmt.Print("[INFO]", result, err)
-		}
-		
-	}
-	//servers.mux.Unlock()
-}
-func validateKubeClusterFields(configFile, kubeURL, kubeServAcctToken string) (bool, string) {
-	if configFile == "" && kubeURL == "" && kubeServAcctToken == "" {
-		fmt.Println("Service Account details are collected from POD")
-		return true, ""
-	}
-	if configFile == "" && kubeURL != "" && kubeServAcctToken != "" {
-		fmt.Println("Using kubeURL and kubeServAcctToken field for Kube Client configuration")
-		return true, ""
-	}
-	if configFile != "" {
-		fmt.Println("Using configFile for configuration")
-		return true, ""
-	}
-	if configFile == "" && kubeURL != "" && kubeServAcctToken == "" {
-		errString := "Kubernetes Cluster Service Account Token Not Present: Connection Parameters invalid"
-		fmt.Println(errString)
-		return false, errString
-	}
-	if configFile == "" && kubeURL == "" && kubeServAcctToken != "" {
-		errString := "Kubernetes Cluster URL Not Present: Connection Parameters invalid"
-		fmt.Println(errString)
-		return false, errString
-	}
-	return false, "Invalid Input Kubernetes connection Parameters"
-}
-func StartController(configFile, kubeURL, kubeServAcctToken string, Namespace []string, servers []string, events [] string) (int, string) {
-     status, statusString := validateKubeClusterFields(configFile, kubeURL, kubeServAcctToken)
-     if !status  {
-         return http.StatusBadRequest, statusString
+func StartController(swg2KubeIntfPtr *swaggerToKubeInterface.SwaggerToKubeInterface) (int, string) {
+	
+     err := swg2KubeIntfPtr.LinkAndStartWatchEvents()
+     if err != nil {
+     	return http.StatusBadRequest, err.Error()
      }
-     api, err := CreateK8sApiserverClient(configFile, kubeURL, kubeServAcctToken) 
-     if (err != nil){
-		 fmt.Println("Error while starting client API session")
-		 return http.StatusBadRequest, "Error while starting client API session: error: " + err.Error()
-     }
-     contr := Controller{}
-     contr.Api = api
-     contr.ServerList = servers
-     contr.EventList = events 
-     for _, event := range events {
-	 if (strings.ToLower(event) == "ingresses"){
-		IngressWatcher(api, contr, Namespace)
-         }
-	 if (strings.ToLower(event) == "endpoints"){
-		EndpointWatcher(api, contr, Namespace)
-         }
-	 if (strings.ToLower(event) == "pods"){
-		PodWatcher(api, contr, Namespace)
-         }
-	 if (strings.ToLower(event) == "services"){
-		ServiceWatcher(api, contr, Namespace)
-         }
-	 if (strings.ToLower(event) == "secrets"){
-		SecretWatcher(api, contr, Namespace)
-         }
-     }
+     
      return http.StatusOK, "Controller Added"
 }
 func GetKubeEvents(configFile, kubeURL, kubeServAcctToken string, event_params ...string) (interface{}, error) {
-	api, err := CreateK8sApiserverClient(configFile, kubeURL, kubeServAcctToken)
+	cS := swaggerInterface.New(configFile, kubeURL, kubeServAcctToken)
+    api, err := cS.CreateK8sApiserverClient() 
 	if (err != nil) {
 		fmt.Println("GetKubeEvents: Error while starting client API session")
 		return "",err
@@ -733,7 +254,7 @@ func GetKubeEvents(configFile, kubeURL, kubeServAcctToken string, event_params .
 	}
 }
 
-func getKubePodEvents(api *KubernetesAPIServer, event_params []string) (interface{}, error) {
+func getKubePodEvents(api *kubernetesAPIServer.KubernetesAPIServer, event_params []string) (interface{}, error) {
 	var message interface{}
 	switch len(event_params) {
 		case 1: {
@@ -755,7 +276,7 @@ func getKubePodEvents(api *KubernetesAPIServer, event_params []string) (interfac
 	}
 	return message, nil
 }
-func getKubeServiceEvents(api *KubernetesAPIServer, event_params []string) (interface{}, error) {
+func getKubeServiceEvents(api *kubernetesAPIServer.KubernetesAPIServer, event_params []string) (interface{}, error) {
 	var message interface{}
 	switch len(event_params) {
 		case 1: {
@@ -777,7 +298,7 @@ func getKubeServiceEvents(api *KubernetesAPIServer, event_params []string) (inte
 	}
 	return message, nil
 }
-func getKubeEndpointEvents(api *KubernetesAPIServer, event_params []string) (interface{}, error) {
+func getKubeEndpointEvents(api *kubernetesAPIServer.KubernetesAPIServer, event_params []string) (interface{}, error) {
 	var message interface{}
 	switch len(event_params) {
 		case 1: {
@@ -799,7 +320,7 @@ func getKubeEndpointEvents(api *KubernetesAPIServer, event_params []string) (int
 	}
 	return message, nil
 }
-func getKubeSecretEvents(api *KubernetesAPIServer, event_params []string) (interface{}, error) {
+func getKubeSecretEvents(api *kubernetesAPIServer.KubernetesAPIServer, event_params []string) (interface{}, error) {
 	var message interface{}
 	switch len(event_params) {
 		case 1: {
@@ -821,7 +342,7 @@ func getKubeSecretEvents(api *KubernetesAPIServer, event_params []string) (inter
 	}
 	return message, nil
 }
-func getKubeIngressEvents(api *KubernetesAPIServer, event_params []string) (interface{}, error) {
+func getKubeIngressEvents(api *kubernetesAPIServer.KubernetesAPIServer, event_params []string) (interface{}, error) {
 	var message interface{}
 	switch len(event_params) {
 		case 1: {
@@ -845,7 +366,8 @@ func getKubeIngressEvents(api *KubernetesAPIServer, event_params []string) (inte
 }
 
 func GetK8sEvents(configFile, kubeURL, kubeServAcctToken, event, namespace, name string) (interface{}, error){
-     api, err := CreateK8sApiserverClient(configFile, kubeURL, kubeServAcctToken) 
+	 cS := swaggerInterface.New(configFile, kubeURL, kubeServAcctToken)
+     api, err := cS.CreateK8sApiserverClient() 
      var message interface{}
      if (err != nil){
 		fmt.Println("Error while starting client API session")
